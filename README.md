@@ -58,3 +58,21 @@ Two other metrics are published, for each metric:
 ## Security
 
 This project does not support authentication yet but that is planned.
+
+## Example
+
+```
+$ mosquitto_pub -m 20.2 -t prometheus/job/ESP8266/instance/livingroom/temperature_celcius
+$ curl -s http://127.0.0.1:9337/metrics|grep temperature_celcius|grep -v '#'
+mqtt_temperature_celcius_last_pushed_timestamp{instance="livingroom",job="ESP8266"} 1.525185129171293e+09
+mqtt_temperature_celcius_push_total{instance="livingroom",job="ESP8266"} 1
+temperature_celcius{instance="livingroom",job="ESP8266"} 20.2
+```
+
+## A note about the prometheus config
+
+If you use `job` and `instance` labels, please refer to the [pushgateway
+exporter
+documentation](https://github.com/prometheus/pushgateway#about-the-job-and-instance-labels).
+
+TL;DR: you should set `honor_labels: true` in the scrape config.
