@@ -33,21 +33,21 @@ go get -u github.com/inuits/mqttgateway
 
 ## How does it work?
 
-mqttgateway will collect to the MQTT broker at `--mqtt.broker-address` and
+mqttgateway will connect to the MQTT broker at `--mqtt.broker-address` and
 listen to the topics specified by `--mqtt.topic`.
 
 By default, it will listen to `prometheus/#`.
 
 The format for the topics is as follow:
 
-`prefix/LABEL1/VALUE1/LABEL1/VALUE2/NAME`
+`prefix/LABEL1/VALUE1/LABEL2/VALUE2/NAME`
 
 A topic `prometheus/job/ESP8266/instance/livingroom/temperature_celcius` would
 be converted to a metric
 `temperature_celcius{job="ESP8266",instance="livingroom"}`.
 
 If labelnames differ for a same metric, then we invalidate existing metrics and
-only keep new ones. The we issue a warning in the logs. You should avoid it.
+only keep new ones. Then we issue a warning in the logs. You should avoid it.
 
 Two other metrics are published, for each metric:
 
