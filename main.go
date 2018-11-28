@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9337").String()
-	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
-	brokerAddress = kingpin.Flag("mqtt.broker-address", "Address of the MQTT broker.").Default("tcp://localhost:1883").String()
+	listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface").Default(":9337").String()
+	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics").Default("/metrics").String()
+	brokerAddress = kingpin.Flag("mqtt.broker-address", "Address of the MQTT broker").Default("tcp://localhost:1883").String()
 	topic         = kingpin.Flag("mqtt.topic", "MQTT topic to subscribe to").Default("prometheus/#").String()
 	prefix        = kingpin.Flag("mqtt.prefix", "MQTT topic prefix to remove when creating metrics").Default("prometheus").String()
+	clientID      = kingpin.Flag("mqtt.client-id", "MQTT client identifier (limit to 23 characters)").Default("").String()
 	progname      = "mqttgateway"
 )
 
