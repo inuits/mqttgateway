@@ -10,7 +10,7 @@ Flags:
 --help-long and --help-man).
   --web.listen-address=":9337"  Address on which to expose metrics and web
 interface.
-  --mqtt.client-id=""              MQTT client identifier (limit to 23 chars)
+  --mqtt.client-id=""           MQTT client identifier (limit to 23 chars)
   --web.telemetry-path="/metrics"
                                 Path under which to expose metrics.
   --mqtt.broker-address="tcp://localhost:1883"
