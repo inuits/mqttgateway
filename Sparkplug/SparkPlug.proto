@@ -1,0 +1,16 @@
+syntax = "proto3";
+package Sparkplug;
+
+message Sparkplug {
+  double timestamp = 1;
+
+  message METRICS {
+    string name = 1;
+    double timestamp = 2;
+    string dataType = 3;
+    double value = 4;
+  }
+
+  METRICS metrics = 2;
+  double seq = 3;
+}
