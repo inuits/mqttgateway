@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-    "encoding/json"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/client_golang/prometheus"
+    "github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/log"
-	pb "Sparkplug/Sparkplug"
+	pb "github.com/IHI-Energy-Storage/mqttgateway/Sparkplug"
 )
 
 var mutex sync.RWMutex
@@ -173,40 +173,25 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 	}
 }
 
-type SparkPlugMetric struct {
-    MetricName string `json:"name"`
-    Timestamp int64    `json:"timestamp"`
-    DataType string `json:"dataType"`
-    Value float64 `json:"value"`
-}
-
-type SparkPlugMsg struct {
-    Timestamp int64    `json:"timestamp"`
-    Metrics []SparkPlugMetric `json:"metrics"`
-    Sequence int    `json:"seq"`
-}
-
 func (e *mqttExporter) receiveSPMessage() func(mqtt.Client, mqtt.Message) {
 	return func(c mqtt.Client, m mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
-        //var f interface{}
-        var f SparkPlugMsg
+        var f pb.Payload
 
-        if err := json.Unmarshal(m.Payload(), &f); err != nil {
+        // Unmarshal MQTT message into Google Protocol Buffer
+        if err := proto.Unmarshal(m.Payload(), &f); err != nil {
             fmt.Println(m.Payload())
             fmt.Printf("error decoding response: %v\n", err)
-            if e, ok := err.(*json.SyntaxError); ok {
-                fmt.Printf("syntax error at byte offset %d\n", e.Offset)
-            }
-
-            //fmt.Println(string(m.Payload()))
             return
         } else {
-            fmt.Println("OK")
+            fmt.Println("{")
+            fmt.Println(f.String())
+            fmt.Println("}")
         }
 
+        
 
 
 		t := m.Topic()
