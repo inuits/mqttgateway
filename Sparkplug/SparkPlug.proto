@@ -1,6 +1,13 @@
 syntax = "proto2";
 
-package Sparkplug;
+/*
+Support for the Sparkplug V2.1 + Appendix Payload B Standard
+
+Source Material from:
+https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Topic+Namespace+and+State+ManagementV2.1+Apendix++Payload+B+format.pdf
+*/
+
+package sparkplug;
 
 message Payload {
     /*

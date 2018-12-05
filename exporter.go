@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
     "github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/log"
-	pb "github.com/IHI-Energy-Storage/mqttgateway/Sparkplug"
+	pb "github.com/IHI-Energy-Storage/mqttgateway/sparkplug"
 )
 
 var mutex sync.RWMutex
@@ -191,7 +191,7 @@ func (e *mqttExporter) receiveSPMessage() func(mqtt.Client, mqtt.Message) {
             fmt.Println("}")
         }
 
-        
+
 
 
 		t := m.Topic()
