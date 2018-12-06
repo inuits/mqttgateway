@@ -249,7 +249,11 @@ func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
     case PB_UInt32:
       return float64(metric.GetIntValue()), nil
     case PB_Int64:
-      return float64(metric.GetLongValue()), nil
+      // This exists because there is an unsigned consersion that
+      // occurs, so moving it to an int64 allows for the sign to work properly
+      tmp_long := metric.GetLongValue()
+      tmp_signed := int64(tmp_long)
+      return float64(tmp_signed), nil
     case PB_UInt64:
       return float64(metric.GetLongValue()), nil
     case PB_Float:
