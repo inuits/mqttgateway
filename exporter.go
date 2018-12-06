@@ -199,6 +199,7 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
     			)
       }
 
+      //metric_val := metric.GetDoubleValue()
       metric_val := metric.GetDoubleValue()
       log.Debugf("%s %s : %g\n", event_string, metric_name, metric_val)
       log.Debugf("Labels: %v\n", labelValues)
