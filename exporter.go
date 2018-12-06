@@ -244,7 +244,7 @@ func (e *mqttExporter) receiveSPMessage() func(mqtt.Client, mqtt.Message) {
       if _, ok := e.metricsLabels[metric_name]; ok {
         for _, l := range e.metricsLabels[metric_name] {
           if compareLabels(l, labels) {
-            log.Warnf("Label names are the same: %v and %v, Existing metric", l, labels)
+            log.Debugf("Label names are the same: %v and %v, Existing metric", l, labels)
             existing_metric = true
           }
         }
