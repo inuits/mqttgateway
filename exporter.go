@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
     "github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/log"
-	pb "github.com/IHI-Energy-Storage/mqttgateway/sparkplug"
+	pb "github.com/IHI-Energy-Storage/mqttgateway/Sparkplug"
 )
 
 var mutex sync.RWMutex
