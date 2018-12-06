@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
-	//"strconv"
 	"strings"
 	"sync"
   "reflect"
+  //"runtime"
+  "errors"
+  //"math"
+  //"strconv"
+  //"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,6 +19,7 @@ import (
 )
 
 var mutex sync.RWMutex
+
 
 type mqttExporter struct {
 	client         mqtt.Client
@@ -199,13 +204,59 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
     			)
       }
 
-      //metric_val := metric.GetDoubleValue()
-      metric_val := metric.GetDoubleValue()
-      log.Debugf("%s %s : %g\n", event_string, metric_name, metric_val)
-      log.Debugf("Labels: %v\n", labelValues)
-      e.metrics[metric_name].With(labelValues).Set(metric_val)
-      e.metrics[pushed_metric_name].With(labelValues).SetToCurrentTime()
-      e.counterMetrics[count_metric_name].With(labelValues).Inc()
+      if metric_val,err := convertMetricToFloat(metric) ; err != nil {
+        log.Errorf("Error %v converting data type for metric %s\n",
+                  err, metric_name)
+      } else {
+        log.Debugf("%s %s : %g\n", event_string, metric_name, metric_val)
+        log.Debugf("Labels: %v\n", labelValues)
+          e.metrics[metric_name].With(labelValues).Set(metric_val)
+          e.metrics[pushed_metric_name].With(labelValues).SetToCurrentTime()
+          e.counterMetrics[count_metric_name].With(labelValues).Inc()
+      }
     }
 	}
+}
+
+func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
+  var errUnexpectedType =
+      errors.New("Non-numeric type could not be converted to float")
+
+  const (
+    PB_Int8 uint32 = 1;
+    PB_Int16 uint32 = 2;
+    PB_Int32 uint32 = 3;
+    PB_Int64 uint32 = 4;
+    PB_UInt8 uint32 = 5;
+    PB_UInt16 uint32 = 6;
+    PB_UInt32 uint32 = 7;
+    PB_UInt64 uint32 = 8;
+    PB_Float uint32 = 9;
+    PB_Double uint32 = 10;
+  )
+
+  switch metric.GetDatatype() {
+    case PB_Int8:
+      return float64(metric.GetIntValue()), nil
+    case PB_Int16:
+      return float64(metric.GetIntValue()), nil
+    case PB_Int32:
+      return float64(metric.GetIntValue()), nil
+    case PB_UInt8:
+      return float64(metric.GetIntValue()), nil
+    case PB_UInt16:
+      return float64(metric.GetIntValue()), nil
+    case PB_UInt32:
+      return float64(metric.GetIntValue()), nil
+    case PB_Int64:
+      return float64(metric.GetLongValue()), nil
+    case PB_UInt64:
+      return float64(metric.GetLongValue()), nil
+    case PB_Float:
+      return float64(metric.GetFloatValue()), nil
+    case PB_Double:
+      return float64(metric.GetDoubleValue()), nil
+    default:
+      return float64(0), errUnexpectedType
+  }
 }
