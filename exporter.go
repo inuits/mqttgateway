@@ -178,87 +178,84 @@ func (e *mqttExporter) receiveSPMessage() func(mqtt.Client, mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
-        var pb_msg pb.Payload
+    var pb_msg pb.Payload
 
-        // Unmarshal MQTT message into Google Protocol Buffer
-        if err := proto.Unmarshal(m.Payload(), &pb_msg); err != nil {
-            log.Errorf("Error decoding GPB ,message: %v\n", err)
-            return
-        } else {
-            log.Debugf("{\n%s}\n", pb_msg.String())
-        }
+    // Unmarshal MQTT message into Google Protocol Buffer
+    if err := proto.Unmarshal(m.Payload(), &pb_msg); err != nil {
+      log.Errorf("Error decoding GPB ,message: %v\n", err)
+      return
+    } else {
+      log.Debugf("{\n%s}\n", pb_msg.String())
+    }
 
-        /** Sparkplug puts 5 key namespacing elements in the topic name **/
-        /** these are being parsed and will be added as metric labels   **/
-        t := m.Topic()
+    /** Sparkplug puts 5 key namespacing elements in the topic name **/
+    /** these are being parsed and will be added as metric labels   **/
+    t := m.Topic()
 		t = strings.TrimPrefix(m.Topic(), *prefix)
 		t = strings.TrimPrefix(t, "/")
 		parts := strings.Split(t, "/")
 
-        /* See the sparkplug definition for the topic construction */
-        if (len(parts) != 5) {
-            log.Warnf("Invalid topic %s, does not comply with Sparkspec", t);
-            return
-        }
+    /* See the sparkplug definition for the topic construction */
+    if (len(parts) != 5) {
+      log.Warnf("Invalid topic %s, does not comply with Sparkspec", t);
+      return
+    }
 
-        /** 6.1.3 covers 9 message types, only process device data **/
-        if (parts[2] != "DDATA") {
-            log.Debugf("Ignoring non-device metric data")
-        }
+    /** 6.1.3 covers 9 message types, only process device data **/
+    if (parts[2] != "DDATA") {
+      log.Debugf("Ignoring non-device metric data")
+    }
 
-        /** Set the Prometheus labels to their corresponding topic part **/
-        var labels = []string {"sp_namespace", "sp_group_id", "sp_msgtype",
-                           "sp_edge_node_id", "sp_device_id"}
+    /** Set the Prometheus labels to their corresponding topic part **/
+    var labels = []string {"sp_namespace", "sp_group_id", "sp_msgtype",
+                       "sp_edge_node_id", "sp_device_id"}
 
-        labelValues := prometheus.Labels{}
+    labelValues := prometheus.Labels{}
 
-        //ihi_asset_id := parts[1] + ":" + parts[3] + ":" + parts[4]
-        //parts = append(parts, ihi_asset_id)
+    for i, l := range labels {
+      labelValues[l] = parts[i]
+      log.Debugf("Label - %s:%s\n", l, labelValues[l])
+    }
 
-        for i, l := range labels {
-            labelValues[l] = parts[i]
-            log.Debugf("Label - %s:%s\n", l, labelValues[l])
-        }
+    /**  Sparkplug messages contain multiple metrics within them **/
+    /** traverse them and process them                           **/
+    metric_list := pb_msg.GetMetrics()
 
-        /**  Sparkplug messages contain multiple metrics within them **/
-        /** traverse them and process them                           **/
-        metric_list := pb_msg.GetMetrics()
+    for i,metric := range metric_list {
+      metric_name := metric.GetName()
+      pushed_metric_name :=
+              fmt.Sprintf("mqtt_%s_last_pushed_timestamp", metric_name)
+      count_metric_name :=
+              fmt.Sprintf("mqtt_%s_push_total", metric_name)
 
-        for i,metric := range metric_list {
-            metric_name := metric.GetName()
-            pushed_metric_name :=
-                    fmt.Sprintf("mqtt_%s_last_pushed_timestamp", metric_name)
-            count_metric_name :=
-                    fmt.Sprintf("mqtt_%s_push_total", metric_name)
+      log.Debugf("%d %s %f\n", i,
+                  metric_name, metric.GetDoubleValue())
+      log.Debugf("%s %s\n", pushed_metric_name, count_metric_name)
 
-            log.Debugf("%d %s %f\n", i,
-                        metric_name, metric.GetDoubleValue())
-            log.Debugf("%s %s\n", pushed_metric_name, count_metric_name)
+      invalidate := false
 
-            invalidate := false
+  		if _, ok := e.metricsLabels[metric_name]; ok {
+  			l := e.metricsLabels[metric_name]
+  			if !compareLabels(l, labels) {
+  				log.Warnf("Label names are different: %v and %v, invalidating existing metric", l, labels)
+  				prometheus.Unregister(e.metrics[metric_name])
+  				invalidate = true
+  			}
+  		}
 
-    		if _, ok := e.metricsLabels[metric_name]; ok {
-    			l := e.metricsLabels[metric_name]
-    			if !compareLabels(l, labels) {
-    				log.Warnf("Label names are different: %v and %v, invalidating existing metric", l, labels)
-    				prometheus.Unregister(e.metrics[metric_name])
-    				invalidate = true
-    			}
-    		}
-
-    		e.metricsLabels[metric_name] = labels
-    		if _, ok := e.metrics[metric_name]; ok && !invalidate {
-    			log.Debugf("Metric %s already exists", metric_name)
-    		} else {
-    			log.Debugf("Creating new metric: %s %v", metric_name, labels)
-    			e.metrics[metric_name] = prometheus.NewGaugeVec(
-    				prometheus.GaugeOpts{
-    					Name: metric_name,
-    					Help: "Metric pushed via MQTT",
-    				},
-    				labels,
-    			)
-    			e.counterMetrics[count_metric_name] = prometheus.NewCounterVec(
+  		e.metricsLabels[metric_name] = labels
+  		if _, ok := e.metrics[metric_name]; ok && !invalidate {
+  			log.Debugf("Metric %s already exists", metric_name)
+  		} else {
+			  log.Debugf("Creating new metric: %s %v", metric_name, labels)
+  			e.metrics[metric_name] = prometheus.NewGaugeVec(
+  				prometheus.GaugeOpts{
+  					Name: metric_name,
+  					Help: "Metric pushed via MQTT",
+  				},
+  				labels,
+  			)
+        e.counterMetrics[count_metric_name] = prometheus.NewCounterVec(
     				prometheus.CounterOpts{
     					Name: count_metric_name,
     					Help: fmt.Sprintf("Number of times %s was pushed via MQTT", metric_name),
@@ -272,15 +269,15 @@ func (e *mqttExporter) receiveSPMessage() func(mqtt.Client, mqtt.Message) {
     				},
     				labels,
     			)
-    		}
+      }
 
-            metric_val := metric.GetDoubleValue()
-            log.Debugf("Metric %s : %g\n", metric_name, metric_val)
-            log.Debugf("Labels: %v\n", labelValues)
-            e.metrics[metric_name].With(labelValues).Set(metric_val)
-            e.metrics[pushed_metric_name].With(labelValues).SetToCurrentTime()
-            e.counterMetrics[count_metric_name].With(labelValues).Inc()
-        }
+      metric_val := metric.GetDoubleValue()
+      log.Debugf("Metric %s : %g\n", metric_name, metric_val)
+      log.Debugf("Labels: %v\n", labelValues)
+      e.metrics[metric_name].With(labelValues).Set(metric_val)
+      e.metrics[pushed_metric_name].With(labelValues).SetToCurrentTime()
+      e.counterMetrics[count_metric_name].With(labelValues).Inc()
+    }
 	}
 }
 
