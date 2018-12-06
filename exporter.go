@@ -200,8 +200,8 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
       }
 
       metric_val := metric.GetDoubleValue()
-      log.Infof("%s %s : %g\n", event_string, metric_name, metric_val)
-      log.Infof("Labels: %v\n", labelValues)
+      log.Debugf("%s %s : %g\n", event_string, metric_name, metric_val)
+      log.Debugf("Labels: %v\n", labelValues)
       e.metrics[metric_name].With(labelValues).Set(metric_val)
       e.metrics[pushed_metric_name].With(labelValues).SetToCurrentTime()
       e.counterMetrics[count_metric_name].With(labelValues).Inc()
