@@ -16,6 +16,12 @@ import (
 
 var mutex sync.RWMutex
 
+const (
+	//SPPushTotalMetric      string = "sp_total_metrics_pushed"
+	//SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
+	SPTopicLabel string = "sp_topic"
+)
+
 type mqttExporter struct {
 	client      mqtt.Client
 	versionDesc *prometheus.Desc
@@ -143,9 +149,8 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		/* See the sparkplug definition for the topic construction */
 		/** Set the Prometheus labels to their corresponding topic part **/
 
-		//
-		var labels = []string{"sp_namespace", "sp_group_id", "sp_msgtype",
-			"sp_edge_node_id", "sp_device_id"}
+		var labels = []string{"sp_namespace", "sp_group_id",
+			"sp_msgtype", "sp_edge_node_id", "sp_device_id"}
 
 		labelValues := prometheus.Labels{}
 
@@ -161,12 +166,17 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			labelValues[l] = parts[i]
 		}
 
+		// Add the topic as a label to the metrics
+		labels = append(labels, SPTopicLabel)
+		labelValues[SPTopicLabel] = t
+
 		/**  Sparkplug messages contain multiple metrics within them **/
 		/** traverse them and process them                           **/
 		metricList := pbMsg.GetMetrics()
 
 		for _, metric := range metricList {
 			metricName := metric.GetName()
+
 			pushedMetricName :=
 				fmt.Sprintf("mqtt_%s_last_pushed_timestamp", metricName)
 			countMetricName :=
