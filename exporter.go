@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 
@@ -16,10 +15,11 @@ import (
 
 var mutex sync.RWMutex
 
+// contants for various SP labels and metric names
 const (
-	//SPPushTotalMetric      string = "sp_total_metrics_pushed"
-	//SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
-	SPTopicLabel string = "sp_topic"
+	SPPushTotalMetric      string = "sp_total_metrics_pushed"
+	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
+	SPTopicLabel           string = "sp_topic"
 )
 
 type mqttExporter struct {
@@ -30,10 +30,6 @@ type mqttExporter struct {
 	// Holds the mertrics collected
 	metrics        map[string]*prometheus.GaugeVec
 	counterMetrics map[string]*prometheus.CounterVec
-
-	// Holds the labels.  Note that because the same metric can be set across
-	// topics, each unique set of labels are stored with that metric
-	metricsLabels map[string][]prometheus.Labels
 }
 
 func newMQTTExporter() *mqttExporter {
@@ -63,7 +59,6 @@ func newMQTTExporter() *mqttExporter {
 
 	e.metrics = make(map[string]*prometheus.GaugeVec)
 	e.counterMetrics = make(map[string]*prometheus.CounterVec)
-	e.metricsLabels = make(map[string][]prometheus.Labels)
 
 	m.Subscribe(*topic, 2, e.receiveMessage())
 	return e
@@ -125,84 +120,51 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			return
 		}
 
-		// Sparkplug puts 5 key namespacing elements in the topic name
-		// these are being parsed and will be added as metric labels
+		topic := m.Topic()
+		log.Debugf("Received message from topic: %s", topic)
 
-		t := strings.TrimPrefix(m.Topic(), *prefix)
-		t = strings.TrimPrefix(t, "/")
-		parts := strings.Split(t, "/")
+		// Get the labels and value for the labels from the topic and constants
+		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
 
-		log.Debugf("Received message from topic: %s", t)
-		log.Debugf("{\n%s\n}\n", pbMsg.String())
-
-		// 6.1.3 covers 9 message types, only process device data
-		if (parts[2] == "DDATA") || (parts[2] == "DBIRTH") {
-			if len(parts) != 5 {
-				log.Debugf("Ignoring topic %s, does not comply with Sparkspec\n", t)
-				return
-			}
-		} else {
-			log.Debugf("Ignoring non-device metric data: %s\n", parts[2])
+		if processMetric != true {
 			return
 		}
 
-		/* See the sparkplug definition for the topic construction */
-		/** Set the Prometheus labels to their corresponding topic part **/
+		if _, ok := e.counterMetrics[SPPushTotalMetric]; !ok {
+			log.Debugf("Creating new SP metric %s for %s\n", SPPushTotalMetric, topic)
 
-		var labels = []string{"sp_namespace", "sp_group_id",
-			"sp_msgtype", "sp_edge_node_id", "sp_device_id"}
-
-		labelValues := prometheus.Labels{}
-
-		// Labels are created from the topic parsing above and compared against
-		// the set of labels for this metric.   If this is a unique set then it will
-		// be stored and the metric will be treated as unique and new.   If the
-		// metric and label set is not new, it will be updated.
-		//
-		// The logic for this is that the same metric name could used across
-		// topics (same metric posted for different devices)
-
-		for i, l := range labels {
-			labelValues[l] = parts[i]
+			e.counterMetrics[SPPushTotalMetric] = prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: SPPushTotalMetric,
+					Help: fmt.Sprintf("Number of messages published on topic %s", topic),
+				},
+				labels,
+			)
 		}
 
-		// Add the topic as a label to the metrics
-		labels = append(labels, SPTopicLabel)
-		labelValues[SPTopicLabel] = t
+		if _, ok := e.metrics[SPLastTimePushedMetric]; !ok {
+			log.Debugf("Creating new SP metric %s for %s\n", SPLastTimePushedMetric,
+				topic)
 
-		/**  Sparkplug messages contain multiple metrics within them **/
-		/** traverse them and process them                           **/
+			e.metrics[SPLastTimePushedMetric] = prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: SPLastTimePushedMetric,
+					Help: fmt.Sprintf("Last time a metric was pushed to topic %s", topic),
+				},
+				labels,
+			)
+		}
+
+		// Sparkplug messages contain multiple metrics within them
+		// traverse them and process them
 		metricList := pbMsg.GetMetrics()
 
 		for _, metric := range metricList {
 			metricName := metric.GetName()
 
-			pushedMetricName :=
-				fmt.Sprintf("mqtt_%s_last_pushed_timestamp", metricName)
-			countMetricName :=
-				fmt.Sprintf("mqtt_%s_push_total", metricName)
-
-			existingMetric := false
-
-			if _, ok := e.metricsLabels[metricName]; ok {
-				for _, l := range e.metricsLabels[metricName] {
-
-					log.Debugf("Comparing Labels: %v and %v\n", l, labelValues)
-
-					if reflect.DeepEqual(l, labelValues) {
-						existingMetric = true
-						break
-					}
-				}
-			}
-
-			if _, ok := e.metrics[metricName]; ok && existingMetric {
-				eventString = "Updating metric"
-			} else {
-				e.metricsLabels[metricName] =
-					append(e.metricsLabels[metricName], labelValues)
-
+			if _, ok := e.metrics[metricName]; !ok {
 				eventString = "Creating metric"
+
 				e.metrics[metricName] = prometheus.NewGaugeVec(
 					prometheus.GaugeOpts{
 						Name: metricName,
@@ -210,20 +172,8 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					},
 					labels,
 				)
-				e.counterMetrics[countMetricName] = prometheus.NewCounterVec(
-					prometheus.CounterOpts{
-						Name: countMetricName,
-						Help: fmt.Sprintf("Number of times %s was pushed via MQTT", metricName),
-					},
-					labels,
-				)
-				e.metrics[pushedMetricName] = prometheus.NewGaugeVec(
-					prometheus.GaugeOpts{
-						Name: pushedMetricName,
-						Help: fmt.Sprintf("Last time %s was pushed via MQTT", metricName),
-					},
-					labels,
-				)
+			} else {
+				eventString = "Updating metric"
 			}
 
 			if metricVal, err := convertMetricToFloat(metric); err != nil {
@@ -231,13 +181,58 @@ func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					err, metricName)
 			} else {
 				log.Debugf("%s %s : %g\n", eventString, metricName, metricVal)
-				log.Debugf("Labels: %v\n", labelValues)
 				e.metrics[metricName].With(labelValues).Set(metricVal)
-				e.metrics[pushedMetricName].With(labelValues).SetToCurrentTime()
-				e.counterMetrics[countMetricName].With(labelValues).Inc()
+				e.metrics[SPLastTimePushedMetric].With(labelValues).SetToCurrentTime()
+				e.counterMetrics[SPPushTotalMetric].With(labelValues).Inc()
 			}
 		}
 	}
+}
+
+func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
+	t := strings.TrimPrefix(topic, *prefix)
+	t = strings.TrimPrefix(t, "/")
+	parts := strings.Split(t, "/")
+
+	// 6.1.3 covers 9 message types, only process device data
+	// Sparkplug puts 5 key namespacing elements in the topic name
+	// these are being parsed and will be added as metric labels
+
+	if (parts[2] == "DDATA") || (parts[2] == "DBIRTH") {
+		if len(parts) != 5 {
+			log.Debugf("Ignoring topic %s, does not comply with Sparkspec\n", t)
+			return nil, nil, false
+		}
+	} else {
+		log.Debugf("Ignoring non-device metric data: %s\n", parts[2])
+		return nil, nil, false
+	}
+
+	/* See the sparkplug definition for the topic construction */
+	/** Set the Prometheus labels to their corresponding topic part **/
+
+	var labels = []string{"sp_namespace", "sp_group_id",
+		"sp_msgtype", "sp_edge_node_id", "sp_device_id"}
+
+	labelValues := prometheus.Labels{}
+
+	// Labels are created from the topic parsing above and compared against
+	// the set of labels for this metric.   If this is a unique set then it will
+	// be stored and the metric will be treated as unique and new.   If the
+	// metric and label set is not new, it will be updated.
+	//
+	// The logic for this is that the same metric name could used across
+	// topics (same metric posted for different devices)
+
+	for i, l := range labels {
+		labelValues[l] = parts[i]
+	}
+
+	// Add the topic as a label to the metrics
+	labels = append(labels, SPTopicLabel)
+	labelValues[SPTopicLabel] = topic
+
+	return labels, labelValues, true
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
