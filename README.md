@@ -1,9 +1,11 @@
-# MQTTGateway for Prometheus
+# Spark Plug Gateway for Prometheus
+
+A project that subscribes to MQTT queues, reads / parses Spark Plug messages and pushes them as Prometheus metrics.
 
 A project that subscribes to MQTT queues and published prometheus metrics.
 
 ```
-usage: mqttgateway [<flags>]
+usage: sparkpluggw [<flags>]
 
 Flags:
   --help                        Show context-sensitive help (also try
@@ -29,46 +31,41 @@ above. Valid levels: [debug, info, warn, error, fatal]
 Requires go > 1.9
 
 ```
-go get -u github.com/inuits/mqttgateway
+go get -u github.com/inuits/sparkpluggw
 ```
 
 ## How does it work?
 
-mqttgateway will connect to the MQTT broker at `--mqtt.broker-address` and
+sparkpluggw will connect to the MQTT broker at `--mqtt.broker-address` and
 listen to the topics specified by `--mqtt.topic`.
 
 By default, it will listen to `prometheus/#`.
 
 The format for the topics is as follow:
 
-`prefix/LABEL1/VALUE1/LABEL2/VALUE2/NAME`
+(https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Topic+Namespace+and+State+ManagementV2.1+Apendix++Payload+B+format.pdf)
 
-A topic `prometheus/job/ESP8266/instance/livingroom/temperature_celcius` would
-be converted to a metric
-`temperature_celcius{job="ESP8266",instance="livingroom"}`.
+'namespace/group_id/message_type/edge_node_id/[device_id]'
 
-If labelnames differ for a same metric, then we invalidate existing metrics and
-only keep new ones. Then we issue a warning in the logs. You should avoid it.
+The following sections are parsed into the following labels and attached to metrics:
 
-Two other metrics are published, for each metric:
+- sp_topic
+- sp_namespace
+- sp_group_id
+- sp_msgtype
+- sp_edge_node_id
+- sp_device_id
 
-- `mqtt_NAME_last_pushed_timestamp`, the last time NAME metric has been pushed
-(unix time, in seconds)
-- `mqtt_NAME_push_total`, the number of times a metric has been pushed
+Currently only numeric metrics are supported.
+
+In addition to published metrics, sparkpluggw will also publish two additional metrics per topic where messages have been received.
+
+sp_total_metrics_pushed  - Total metrics processed for that topic
+sp_last_pushed_timestamp - Last timestamp of a message received for that topic
 
 ## Security
 
 This project does not support authentication yet but that is planned.
-
-## Example
-
-```
-$ mosquitto_pub -m 20.2 -t prometheus/job/ESP8266/instance/livingroom/temperature_celcius
-$ curl -s http://127.0.0.1:9337/metrics|grep temperature_celcius|grep -v '#'
-mqtt_temperature_celcius_last_pushed_timestamp{instance="livingroom",job="ESP8266"} 1.525185129171293e+09
-mqtt_temperature_celcius_push_total{instance="livingroom",job="ESP8266"} 1
-temperature_celcius{instance="livingroom",job="ESP8266"} 20.2
-```
 
 ## A note about the prometheus config
 

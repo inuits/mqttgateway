@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	pb "github.com/IHI-Energy-Storage/mqttgateway/Sparkplug"
+	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,7 +22,7 @@ const (
 	SPTopicLabel           string = "sp_topic"
 )
 
-type mqttExporter struct {
+type spplugExporter struct {
 	client      mqtt.Client
 	versionDesc *prometheus.Desc
 	connectDesc *prometheus.Desc
@@ -32,7 +32,7 @@ type mqttExporter struct {
 	counterMetrics map[string]*prometheus.CounterVec
 }
 
-func newMQTTExporter() *mqttExporter {
+func newMQTTExporter() *spplugExporter {
 	// create a MQTT client
 	options := mqtt.NewClientOptions()
 
@@ -46,7 +46,7 @@ func newMQTTExporter() *mqttExporter {
 	}
 
 	// create an exporter
-	e := &mqttExporter{
+	e := &spplugExporter{
 		client: m,
 		versionDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(progname, "build", "info"),
@@ -64,7 +64,7 @@ func newMQTTExporter() *mqttExporter {
 	return e
 }
 
-func (e *mqttExporter) Describe(ch chan<- *prometheus.Desc) {
+func (e *spplugExporter) Describe(ch chan<- *prometheus.Desc) {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	ch <- e.versionDesc
@@ -77,7 +77,7 @@ func (e *mqttExporter) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-func (e *mqttExporter) Collect(ch chan<- prometheus.Metric) {
+func (e *spplugExporter) Collect(ch chan<- prometheus.Metric) {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	ch <- prometheus.MustNewConstMetric(
@@ -106,7 +106,7 @@ func (e *mqttExporter) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
+func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 	return func(c mqtt.Client, m mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
