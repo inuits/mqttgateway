@@ -31,7 +31,7 @@ above. Valid levels: [debug, info, warn, error, fatal]
 Requires go > 1.9
 
 ```
-go get -u github.com/inuits/sparkpluggw
+go get -u github.com/IHI-Energy-Storage/sparkpluggw
 ```
 
 ## How does it work?
@@ -43,7 +43,7 @@ By default, it will listen to `prometheus/#`.
 
 The format for the topics is as follow:
 
-(https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Topic+Namespace+and+State+ManagementV2.1+Apendix++Payload+B+format.pdf)
+[Link to 2.1AB specification](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Topic+Namespace+and+State+ManagementV2.1+Apendix++Payload+B+format.pdf)
 
 'namespace/group_id/message_type/edge_node_id/[device_id]'
 
