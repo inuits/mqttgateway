@@ -60,8 +60,8 @@ Currently only numeric metrics are supported.
 
 In addition to published metrics, sparkpluggw will also publish two additional metrics per topic where messages have been received.
 
-sp_total_metrics_pushed  - Total metrics processed for that topic
-sp_last_pushed_timestamp - Last timestamp of a message received for that topic
+- sp_total_metrics_pushed  - Total metrics processed for that topic
+- sp_last_pushed_timestamp - Last timestamp of a message received for that topic
 
 ## Security
 
