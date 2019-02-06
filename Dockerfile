@@ -1,23 +1,15 @@
-# iron/go:dev is the alpine image with the go tools added
-FROM iron/go:dev
+FROM golang:1.8.5-jessie
 
-WORKDIR /mqttgateway
+ARG mqtt_ip
+ARG mqtt_port
+ARG mqtt_topic
+ARG client_id
 
-ENV SRC_DIR=/go/src/github.com/IHI-Energy-Storage/mqttgateway/
-EXPOSE 9337
+# Download and build the Go application
+RUN go get github.com/IHI-Energy-Storage/sparkpluggw
 
-ADD . $SRC_DIR
+# Go into binary directory
+WORKDIR /go/bin
 
-# Get dependencies
-RUN go get github.com/eclipse/paho.mqtt.golang
-RUN go get github.com/golang/protobuf/proto
-RUN go get github.com/prometheus/client_golang/prometheus
-RUN go get github.com/prometheus/client_golang/prometheus/promhttp
-RUN go get github.com/prometheus/common/log
-github.com/prometheus/common/log
-
-# Build it:
-RUN cd $SRC_DIR; go build -o sparkpluggw; cp sparkpluggw /sparkpluggw/
-
-
-ENTRYPOINT ["./sparkpluggw --mqtt.broker-address=tcp://172.30.20.67:1883 --mqtt.client-id=MQTT_FX_Client --mqtt.topic=spBv1.0/prod:ess/#"]
+# Run the service
+CMD ["./sparkpluggw --mqtt.broker-address=tcp://$mqtt_ip:$mqtt_port --mqtt.client-id=$client_id --mqtt.topic=$mqtt_topic --log.format="logger:stdout?json=true"]
