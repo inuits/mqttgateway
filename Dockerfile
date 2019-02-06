@@ -12,4 +12,5 @@ RUN go get github.com/IHI-Energy-Storage/sparkpluggw
 WORKDIR /go/bin
 
 # Run the service
-CMD ["./sparkpluggw --mqtt.broker-address=tcp://$mqtt_ip:$mqtt_port --mqtt.client-id=$client_id --mqtt.topic=$mqtt_topic --log.format="logger:stdout?json=true"]
+ENTRYPOINT  [ "./sparkpluggw" ]
+CMD         ["--mqtt.broker-address=tcp://$mqtt_ip:$mqtt_port --mqtt.client-id=$client_id --mqtt.topic=$mqtt_topic"]
