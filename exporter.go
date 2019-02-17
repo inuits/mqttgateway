@@ -253,11 +253,17 @@ func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
 
 	switch metric.GetDatatype() {
 	case PBInt8:
-		return float64(metric.GetIntValue()), nil
+		tmpLong := metric.GetIntValue()
+		tmpSigned := int8(tmpLong)
+		return float64(tmpSigned), nil
 	case PBInt16:
-		return float64(metric.GetIntValue()), nil
+		tmpLong := metric.GetIntValue()
+		tmpSigned := int16(tmpLong)
+		return float64(tmpSigned), nil
 	case PBInt32:
-		return float64(metric.GetIntValue()), nil
+		tmpLong := metric.GetIntValue()
+		tmpSigned := int32(tmpLong)
+		return float64(tmpSigned), nil
 	case PBUInt8:
 		return float64(metric.GetIntValue()), nil
 	case PBUInt16:
