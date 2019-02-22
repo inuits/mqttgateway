@@ -19,7 +19,6 @@ var mutex sync.RWMutex
 const (
 	SPPushTotalMetric      string = "sp_total_metrics_pushed"
 	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
-	SPTopicLabel           string = "sp_topic"
 )
 
 type spplugExporter struct {
@@ -223,19 +222,10 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	// The logic for this is that the same metric name could used across
 	// topics (same metric posted for different devices)
 
-	for i, l := range labels {
-		
-		// Skip the message type, it causes issues in prometheus metrics
-		if (i == 2) {
-			continue
-		}
-
-		labelValues[l] = parts[i]
-	}
-
-	// Add the topic as a label to the metrics
-	labels = append(labels, SPTopicLabel)
-	labelValues[SPTopicLabel] = topic
+	labelValues["sp_namespace"] = parts[0]
+	labelValues["sp_group_id"] = parts[1]
+	labelValues["sp_edge_node_id"] = parts[3]
+	labelValues["sp_device_id"] = parts[4]
 
 	return labels, labelValues, true
 }
