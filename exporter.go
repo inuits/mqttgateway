@@ -211,8 +211,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	/* See the sparkplug definition for the topic construction */
 	/** Set the Prometheus labels to their corresponding topic part **/
 
-	var labels = []string{"sp_namespace", "sp_group_id",
-		"sp_msgtype", "sp_edge_node_id", "sp_device_id"}
+	var labels = []string{"sp_namespace", "sp_group_id", "sp_edge_node_id", "sp_device_id"}
 
 	labelValues := prometheus.Labels{}
 
@@ -225,6 +224,12 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	// topics (same metric posted for different devices)
 
 	for i, l := range labels {
+		
+		// Skip the message type, it causes issues in prometheus metrics
+		if (i == 2) {
+			continue
+		}
+
 		labelValues[l] = parts[i]
 	}
 
