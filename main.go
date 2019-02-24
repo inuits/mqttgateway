@@ -16,13 +16,14 @@ var (
 	topic         = kingpin.Flag("mqtt.topic", "MQTT topic to subscribe to").Default("prometheus/#").String()
 	prefix        = kingpin.Flag("mqtt.prefix", "MQTT topic prefix to remove when creating metrics").Default("prometheus").String()
 	clientID      = kingpin.Flag("mqtt.client-id", "MQTT client identifier (limit to 23 characters)").Default("").String()
+	//mqttDebug	  = kingpin.Flag("mqtt.debug", "Detailed MQTT debugging information").Default("off").String()
 	progname      = "sparkpluggw"
 )
 
 func main() {
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
-
+	
 	prometheus.MustRegister(newMQTTExporter())
 
 	http.Handle(*metricsPath, promhttp.Handler())

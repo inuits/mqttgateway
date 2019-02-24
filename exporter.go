@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"os"
+	oslog "log"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -32,6 +34,12 @@ type spplugExporter struct {
 }
 
 func newMQTTExporter() *spplugExporter {
+	// Integrate Logging
+	mqtt.ERROR = oslog.New(os.Stdout, "MQTT ERROR    ", oslog.Ltime)
+	mqtt.CRITICAL = oslog.New(os.Stdout, "MQTT CRITICAL ", oslog.Ltime)
+	mqtt.WARN = oslog.New(os.Stdout, "MQTT WARNING  ", oslog.Ltime)
+	mqtt.DEBUG = oslog.New(os.Stdout, "MQTT DEBUG    ", oslog.Ltime)
+
 	// create a MQTT client
 	options := mqtt.NewClientOptions()
 
