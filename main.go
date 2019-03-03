@@ -39,7 +39,6 @@ var (
 	mqttDebug = kingpin.Flag("mqtt.debug", "Enable MQTT debugging").
 			Default("false").String()
 
-	//mqttDebug	  = kingpin.Flag("mqtt.debug", "Detailed MQTT debugging information").Default("off").String()
 	progname = "sparkpluggw"
 )
 
@@ -47,7 +46,7 @@ func main() {
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
 
-	prometheus.MustRegister(newMQTTExporter())
+	prometheus.MustRegister(initSparkPlugExporter())
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	log.Infoln("Listening on", *listenAddress)
