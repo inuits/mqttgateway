@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	oslog "log"
+	"os"
 	"strings"
 	"sync"
-	"os"
-	oslog "log"
+	"time"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -16,6 +17,7 @@ import (
 )
 
 var mutex sync.RWMutex
+var edgeNodeList map[string]bool
 
 // contants for various SP labels and metric names
 const (
@@ -33,12 +35,26 @@ type spplugExporter struct {
 	counterMetrics map[string]*prometheus.CounterVec
 }
 
+/*
+var publishHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	fmt.Printf("TOPIC: %s\n", msg.Topic())
+	fmt.Printf("MSG: %s\n", msg.Payload())
+}
+
+var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
+	log.Infof("Initializing Edge Node List\n")
+	edgeNodeList = make(map[string]bool)
+}
+*/
+
 func newMQTTExporter() *spplugExporter {
-	// Integrate Logging
-	mqtt.ERROR = oslog.New(os.Stdout, "MQTT ERROR    ", oslog.Ltime)
-	mqtt.CRITICAL = oslog.New(os.Stdout, "MQTT CRITICAL ", oslog.Ltime)
-	mqtt.WARN = oslog.New(os.Stdout, "MQTT WARNING  ", oslog.Ltime)
-	mqtt.DEBUG = oslog.New(os.Stdout, "MQTT DEBUG    ", oslog.Ltime)
+
+	if *mqttDebug == "true" {
+		mqtt.ERROR = oslog.New(os.Stdout, "MQTT ERROR    ", oslog.Ltime)
+		mqtt.CRITICAL = oslog.New(os.Stdout, "MQTT CRITICAL ", oslog.Ltime)
+		mqtt.WARN = oslog.New(os.Stdout, "MQTT WARNING  ", oslog.Ltime)
+		mqtt.DEBUG = oslog.New(os.Stdout, "MQTT DEBUG    ", oslog.Ltime)
+	}
 
 	// create a MQTT client
 	options := mqtt.NewClientOptions()
@@ -46,6 +62,10 @@ func newMQTTExporter() *spplugExporter {
 	log.Infof("Connecting to %v", *brokerAddress)
 	options.AddBroker(*brokerAddress)
 	options.SetClientID(*clientID)
+	options.SetWriteTimeout(5 * time.Second)
+	options.SetDefaultPublishHandler(publishHandler)
+	options.SetOnConnectHandler(connectHandler)
+	options.SetPingTimeout(1 * time.Second)
 
 	m := mqtt.NewClient(options)
 	if token := m.Connect(); token.Wait() && token.Error() != nil {
@@ -128,7 +148,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		}
 
 		topic := m.Topic()
-		log.Debugf("Received message from topic: %s", topic)
+		log.Infof("Received message from topic: %s", topic)
 
 		// Get the labels and value for the labels from the topic and constants
 		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
@@ -136,6 +156,11 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		if processMetric != true {
 			return
 		}
+
+		// Process this edge node, if it is unique start the re-birth process
+		e.evaluateEdgeNode(c, labelValues["sp_namespace"],
+			labelValues["sp_group_id"],
+			labelValues["sp_edge_node_id"])
 
 		if _, ok := e.counterMetrics[SPPushTotalMetric]; !ok {
 			log.Debugf("Creating new SP metric %s for %s\n", SPPushTotalMetric, topic)
@@ -193,6 +218,56 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				e.counterMetrics[SPPushTotalMetric].With(labelValues).Inc()
 			}
 		}
+	}
+}
+
+// If the edge node is unique (this is the first time seeing it), then
+// issue an NCMD and start the rebirth process so we get a fresh set of all
+// the metrics / tags
+
+func (e *spplugExporter) evaluateEdgeNode(c mqtt.Client, namespace string,
+	group string, nodeID string) {
+
+	edgeNode := group + "/" + nodeID
+	topic := namespace + "/" + group + "/NCMD/" + nodeID
+
+	if _, exists := edgeNodeList[edgeNode]; exists == false {
+		edgeNodeList[edgeNode] = true
+		e.sendMsg(e.client, topic)
+	} else {
+		log.Debugf("Known edge node: %s\n", topic)
+	}
+}
+
+func (e *spplugExporter) sendMsg(c mqtt.Client, topic string) {
+	var pbMsg pb.Payload
+	var pbMetric pb.Payload_Metric
+	var pbMetricList []*pb.Payload_Metric
+	var pbValue pb.Payload_Metric_BooleanValue
+
+	time := uint64(time.Now().UnixNano() / 1000000)
+	metricName := "Node Control/Rebirth"
+	dataType := uint32(14)
+
+	pbValue.BooleanValue = true
+	pbMetric.Name = &metricName
+	pbMetric.Timestamp = &time
+	pbMetric.Datatype = &dataType
+	pbMetric.Value = &pbValue
+	pbMetricList = append(pbMetricList, &pbMetric)
+
+	pbMsg.Timestamp = &time
+	pbMsg.Metrics = pbMetricList
+
+	msg, err := proto.Marshal(&pbMsg)
+
+	if err != nil {
+		log.Warnf("Failed to Marshall: %s\n", err)
+	} else {
+		token := c.Publish(topic, 0, false, msg)
+		token.Wait()
+
+		log.Infof("Sending NCMD message to topic: %s\n", topic)
 	}
 }
 
