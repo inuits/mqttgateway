@@ -21,6 +21,27 @@ var edgeNodeList map[string]bool
 const (
 	SPPushTotalMetric      string = "sp_total_metrics_pushed"
 	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
+	PBInt8                 uint32 = 1
+	PBInt16                uint32 = 2
+	PBInt32                uint32 = 3
+	PBInt64                uint32 = 4
+	PBUInt8                uint32 = 5
+	PBUInt16               uint32 = 6
+	PBUInt32               uint32 = 7
+	PBUInt64               uint32 = 8
+	PBFloat                uint32 = 9
+	PBDouble               uint32 = 10
+	PBBoolean              uint32 = 11
+	PBString               uint32 = 12
+	PBDateTime             uint32 = 13
+	PBText                 uint32 = 14
+	PBUUID                 uint32 = 15
+	PBDataSet              uint32 = 16
+	PBBytes                uint32 = 17
+	PBFile                 uint32 = 18
+	PBTemplate             uint32 = 19
+	PBPropertySet          uint32 = 20
+	PBPropertySetList      uint32 = 21
 )
 
 type spplugExporter struct {
@@ -135,7 +156,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		}
 
 		topic := m.Topic()
-		log.Infof("Received message from topic: %s", topic)
+		log.Infof("Received message (%s) from topic: %s", pbMsg.String(), topic)
 
 		// Get the labels and value for the labels from the topic and constants
 		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
@@ -234,7 +255,7 @@ func (e *spplugExporter) reincarnate(namespace string, group string,
 
 	time := uint64(time.Now().UnixNano() / 1000000)
 	metricName := "Node Control/Rebirth"
-	dataType := uint32(14)
+	dataType := PBBoolean
 
 	pbValue.BooleanValue = true
 	pbMetric.Name = &metricName

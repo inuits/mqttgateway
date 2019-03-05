@@ -22,7 +22,7 @@ func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
 		token := c.Publish(topic, 0, false, msg)
 		token.Wait()
 
-		log.Infof("Sending NCMD message to topic: %s\n", topic)
+		log.Infof("Sending NCMD message (%s) to topic: %s\n", pbMsg.String(), topic)
 	}
 }
 
