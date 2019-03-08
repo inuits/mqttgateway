@@ -21,27 +21,38 @@ var edgeNodeList map[string]bool
 const (
 	SPPushTotalMetric      string = "sp_total_metrics_pushed"
 	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
-	PBInt8                 uint32 = 1
-	PBInt16                uint32 = 2
-	PBInt32                uint32 = 3
-	PBInt64                uint32 = 4
-	PBUInt8                uint32 = 5
-	PBUInt16               uint32 = 6
-	PBUInt32               uint32 = 7
-	PBUInt64               uint32 = 8
-	PBFloat                uint32 = 9
-	PBDouble               uint32 = 10
-	PBBoolean              uint32 = 11
-	PBString               uint32 = 12
-	PBDateTime             uint32 = 13
-	PBText                 uint32 = 14
-	PBUUID                 uint32 = 15
-	PBDataSet              uint32 = 16
-	PBBytes                uint32 = 17
-	PBFile                 uint32 = 18
-	PBTemplate             uint32 = 19
-	PBPropertySet          uint32 = 20
-	PBPropertySetList      uint32 = 21
+	SPConnectionCount      string = "sp_connection_established_count"
+	SPDisconnectionCount   string = "sp_connection_lost_count"
+
+	SPReincarnationAttempts string = "sp_reincarnation_attempt_count"
+	SPReincarnationFailures string = "sp_reincarnation_failure_count"
+	SPReincarnationSuccess  string = "sp_reincarnation_success_count"
+	SPReincarnationDelay    string = "sp_reincarnation_delayed_count"
+
+	SPReincarnateTimer  uint32 = 900
+	SPReincarnateRetry  uint32 = 60
+	SPReconnectionTimer uint32 = 300
+	PBInt8              uint32 = 1
+	PBInt16             uint32 = 2
+	PBInt32             uint32 = 3
+	PBInt64             uint32 = 4
+	PBUInt8             uint32 = 5
+	PBUInt16            uint32 = 6
+	PBUInt32            uint32 = 7
+	PBUInt64            uint32 = 8
+	PBFloat             uint32 = 9
+	PBDouble            uint32 = 10
+	PBBoolean           uint32 = 11
+	PBString            uint32 = 12
+	PBDateTime          uint32 = 13
+	PBText              uint32 = 14
+	PBUUID              uint32 = 15
+	PBDataSet           uint32 = 16
+	PBBytes             uint32 = 17
+	PBFile              uint32 = 18
+	PBTemplate          uint32 = 19
+	PBPropertySet       uint32 = 20
+	PBPropertySetList   uint32 = 21
 )
 
 type spplugExporter struct {
@@ -68,17 +79,24 @@ func initSparkPlugExporter() *spplugExporter {
 	options := mqtt.NewClientOptions()
 
 	log.Infof("Connecting to %v", *brokerAddress)
+
+	// Set broker and client options
 	options.AddBroker(*brokerAddress)
 	options.SetClientID(*clientID)
+
+	// Set client timeouts and intervals
 	options.SetWriteTimeout(5 * time.Second)
-	options.SetDefaultPublishHandler(publishHandler)
-	options.SetOnConnectHandler(connectHandler)
 	options.SetPingTimeout(1 * time.Second)
+	options.SetMaxReconnectInterval(time.Duration(SPReconnectionTimer))
+
+	// Set handler functions
+	options.SetOnConnectHandler(connectHandler)
+	options.SetConnectionLostHandler(disconnectHandler)
+
+	// Set capabilities
+	options.SetAutoReconnect(true)
 
 	m := mqtt.NewClient(options)
-	if token := m.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
-	}
 
 	// create an exporter
 	e := &spplugExporter{
@@ -92,8 +110,13 @@ func initSparkPlugExporter() *spplugExporter {
 			"Is the exporter connected to mqtt broker", nil, nil),
 	}
 
-	e.metrics = make(map[string]*prometheus.GaugeVec)
-	e.counterMetrics = make(map[string]*prometheus.CounterVec)
+	log.Debugf("Initializing Exporter Metrics and Data\n")
+
+	e.initializeMetricsAndData()
+
+	if token := m.Connect(); token.Wait() && token.Error() != nil {
+		log.Fatal(token.Error())
+	}
 
 	m.Subscribe(*topic, 2, e.receiveMessage())
 	return e
@@ -151,12 +174,13 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 		// Unmarshal MQTT message into Google Protocol Buffer
 		if err := proto.Unmarshal(m.Payload(), &pbMsg); err != nil {
-			log.Errorf("Error decoding GPB ,message: %v\n", err)
+			log.Errorf("Error decoding GPB, message: %v\n", err)
 			return
 		}
 
 		topic := m.Topic()
-		log.Infof("Received message (%s) from topic: %s", pbMsg.String(), topic)
+		log.Infof("Received message: %s\n", topic)
+		log.Debugf("%s\n", pbMsg.String())
 
 		// Get the labels and value for the labels from the topic and constants
 		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
@@ -169,31 +193,6 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		e.evaluateEdgeNode(c, labelValues["sp_namespace"],
 			labelValues["sp_group_id"],
 			labelValues["sp_edge_node_id"])
-
-		if _, ok := e.counterMetrics[SPPushTotalMetric]; !ok {
-			log.Debugf("Creating new SP metric %s for %s\n", SPPushTotalMetric, topic)
-
-			e.counterMetrics[SPPushTotalMetric] = prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Name: SPPushTotalMetric,
-					Help: fmt.Sprintf("Number of messages published on topic %s", topic),
-				},
-				labels,
-			)
-		}
-
-		if _, ok := e.metrics[SPLastTimePushedMetric]; !ok {
-			log.Debugf("Creating new SP metric %s for %s\n", SPLastTimePushedMetric,
-				topic)
-
-			e.metrics[SPLastTimePushedMetric] = prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Name: SPLastTimePushedMetric,
-					Help: fmt.Sprintf("Last time a metric was pushed to topic %s", topic),
-				},
-				labels,
-			)
-		}
 
 		// Sparkplug messages contain multiple metrics within them
 		// traverse them and process them
@@ -248,25 +247,142 @@ func (e *spplugExporter) evaluateEdgeNode(c mqtt.Client, namespace string,
 
 func (e *spplugExporter) reincarnate(namespace string, group string,
 	nodeID string) {
-	var pbMsg pb.Payload
-	var pbMetric pb.Payload_Metric
-	var pbMetricList []*pb.Payload_Metric
-	var pbValue pb.Payload_Metric_BooleanValue
+	go func() {
+		var pbMsg pb.Payload
+		var pbMetric pb.Payload_Metric
+		var pbMetricList []*pb.Payload_Metric
+		var pbValue pb.Payload_Metric_BooleanValue
 
-	time := uint64(time.Now().UnixNano() / 1000000)
-	metricName := "Node Control/Rebirth"
-	dataType := PBBoolean
+		_, labelValues := getNodeLabelSetandValues(namespace, group, nodeID)
 
-	pbValue.BooleanValue = true
-	pbMetric.Name = &metricName
-	pbMetric.Timestamp = &time
-	pbMetric.Datatype = &dataType
-	pbMetric.Value = &pbValue
-	pbMetricList = append(pbMetricList, &pbMetric)
-	pbMsg.Timestamp = &time
-	pbMsg.Metrics = pbMetricList
+		metricName := "Node Control/Rebirth"
+		dataType := PBBoolean
 
-	topic := namespace + "/" + group + "/NCMD/" + nodeID
+		pbValue.BooleanValue = true
+		pbMetric.Name = &metricName
+		pbMetric.Datatype = &dataType
+		pbMetric.Value = &pbValue
 
-	sendMQTTMsg(e.client, &pbMsg, topic)
+		pbMetricList = append(pbMetricList, &pbMetric)
+		pbMsg.Metrics = pbMetricList
+
+		topic := namespace + "/" + group + "/NCMD/" + nodeID
+
+		for true {
+			if e.client.IsConnected() {
+				log.Infof("Reincarnate: %s\n", topic)
+
+				e.counterMetrics[SPReincarnationAttempts].
+					With(labelValues).Inc()
+
+				timestamp := uint64(time.Now().UnixNano() / 1000000)
+				pbMsg.Timestamp = &timestamp
+
+				if sendMQTTMsg(e.client, &pbMsg, topic) {
+					e.counterMetrics[SPReincarnationSuccess].
+						With(labelValues).Inc()
+				} else {
+					e.counterMetrics[SPReincarnationFailures].
+						With(labelValues).Inc()
+				}
+
+				time.Sleep(time.Duration(SPReincarnateTimer) * time.Second)
+			} else {
+				e.counterMetrics[SPReincarnationDelay].With(labelValues).Inc()
+				time.Sleep(time.Duration(SPReincarnateRetry) * time.Second)
+			}
+		}
+	}()
+}
+
+func (e *spplugExporter) initializeMetricsAndData() {
+
+	e.metrics = make(map[string]*prometheus.GaugeVec)
+	e.counterMetrics = make(map[string]*prometheus.CounterVec)
+
+	edgeNodeList = make(map[string]bool)
+
+	labels := getLabelSet()
+	serviceLabels, _ := getServiceLabelSetandValues()
+	nodelabels := getNodeLabelSet()
+
+	log.Debugf("Creating new SP metric %s\n", SPPushTotalMetric)
+
+	e.counterMetrics[SPPushTotalMetric] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPPushTotalMetric,
+			Help: fmt.Sprintf("Number of messages published on a MQTT topic"),
+		},
+		labels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPLastTimePushedMetric)
+
+	e.metrics[SPLastTimePushedMetric] = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: SPLastTimePushedMetric,
+			Help: fmt.Sprintf("Last time a metric was pushed to a MQTT topic"),
+		},
+		labels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPConnectionCount)
+
+	e.counterMetrics[SPConnectionCount] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPConnectionCount,
+			Help: fmt.Sprintf("Total MQTT connections established"),
+		},
+		serviceLabels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPDisconnectionCount)
+
+	e.counterMetrics[SPDisconnectionCount] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPDisconnectionCount,
+			Help: fmt.Sprintf("Total MQTT disconnections"),
+		},
+		serviceLabels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPReincarnationAttempts)
+
+	e.counterMetrics[SPReincarnationAttempts] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPReincarnationAttempts,
+			Help: fmt.Sprintf("Total NCMD message attempts"),
+		},
+		nodelabels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPReincarnationFailures)
+
+	e.counterMetrics[SPReincarnationFailures] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPReincarnationFailures,
+			Help: fmt.Sprintf("Total NCMD message failures"),
+		},
+		nodelabels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPReincarnationSuccess)
+
+	e.counterMetrics[SPReincarnationSuccess] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPReincarnationSuccess,
+			Help: fmt.Sprintf("Total successful NCMD attempts"),
+		},
+		nodelabels,
+	)
+
+	log.Debugf("Creating new SP metric %s\n", SPReincarnationDelay)
+
+	e.counterMetrics[SPReincarnationDelay] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPReincarnationDelay,
+			Help: fmt.Sprintf("Total delayed NCMD attempts due to connection issues"),
+		},
+		nodelabels,
+	)
 }

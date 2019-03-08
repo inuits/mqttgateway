@@ -12,18 +12,20 @@ import (
 )
 
 func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
-	topic string) {
+	topic string) bool {
 
 	msg, err := proto.Marshal(pbMsg)
 
 	if err != nil {
 		log.Warnf("Failed to Marshall: %s\n", err)
-	} else {
-		token := c.Publish(topic, 0, false, msg)
-		token.Wait()
-
-		log.Infof("Sending NCMD message (%s) to topic: %s\n", pbMsg.String(), topic)
+		return false
 	}
+
+	token := c.Publish(topic, 0, false, msg)
+	token.Wait()
+	log.Debugf("%s\n", pbMsg.String())
+
+	return true
 }
 
 func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
@@ -48,7 +50,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	/* See the sparkplug definition for the topic construction */
 	/** Set the Prometheus labels to their corresponding topic part **/
 
-	var labels = []string{"sp_namespace", "sp_group_id", "sp_edge_node_id", "sp_device_id"}
+	var labels = getLabelSet()
 
 	labelValues := prometheus.Labels{}
 
@@ -68,21 +70,39 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	return labels, labelValues, true
 }
 
+func getLabelSet() []string {
+	return []string{"sp_namespace", "sp_group_id", "sp_edge_node_id", "sp_device_id"}
+}
+
+func getServiceLabelSetandValues() ([]string, map[string]string) {
+	labels := []string{"sp_mqtt_topic", "sp_mqtt_server"}
+
+	labelValues := map[string]string{
+		"sp_mqtt_topic":  *topic,
+		"sp_mqtt_server": *brokerAddress,
+	}
+
+	return labels, labelValues
+}
+
+func getNodeLabelSetandValues(namespace string, group string,
+	nodeID string) ([]string, map[string]string) {
+	labels := getNodeLabelSet()
+	labelValues := map[string]string{
+		"sp_namespace":    namespace,
+		"sp_group_id":     group,
+		"sp_edge_node_id": nodeID,
+	}
+
+	return labels, labelValues
+}
+
+func getNodeLabelSet() []string {
+	return []string{"sp_namespace", "sp_group_id", "sp_edge_node_id"}
+}
+
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
 	var errUnexpectedType = errors.New("Non-numeric type could not be converted to float")
-
-	const (
-		PBInt8   uint32 = 1
-		PBInt16  uint32 = 2
-		PBInt32  uint32 = 3
-		PBInt64  uint32 = 4
-		PBUInt8  uint32 = 5
-		PBUInt16 uint32 = 6
-		PBUInt32 uint32 = 7
-		PBUInt64 uint32 = 8
-		PBFloat  uint32 = 9
-		PBDouble uint32 = 10
-	)
 
 	switch metric.GetDatatype() {
 	case PBInt8:

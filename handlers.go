@@ -1,18 +1,19 @@
 package main
 
 import (
-	"fmt"
-
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/common/log"
 )
 
-var publishHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	fmt.Printf("TOPIC: %s\n", msg.Topic())
-	fmt.Printf("MSG: %s\n", msg.Payload())
+var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
+	log.Infof("Connected to MQTT\n")
+	_, labelValues := getServiceLabelSetandValues()
+	exporter.counterMetrics[SPConnectionCount].With(labelValues).Inc()
 }
 
-var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	log.Infof("Initializing Edge Node List\n")
-	edgeNodeList = make(map[string]bool)
+var disconnectHandler mqtt.ConnectionLostHandler = func(client mqtt.Client,
+	err error) {
+	log.Infof("Disconnected from MQTT (%s)\n", err.Error())
+	_, labelValues := getServiceLabelSetandValues()
+	exporter.counterMetrics[SPDisconnectionCount].With(labelValues).Inc()
 }

@@ -40,13 +40,15 @@ var (
 			Default("false").String()
 
 	progname = "sparkpluggw"
+	exporter *spplugExporter
 )
 
 func main() {
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
 
-	prometheus.MustRegister(initSparkPlugExporter())
+	exporter = initSparkPlugExporter()
+	prometheus.MustRegister(exporter)
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	log.Infoln("Listening on", *listenAddress)
