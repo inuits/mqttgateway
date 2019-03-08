@@ -269,7 +269,7 @@ func (e *spplugExporter) reincarnate(namespace string, group string,
 		topic := namespace + "/" + group + "/NCMD/" + nodeID
 
 		for true {
-			if e.client.IsConnected() {
+			if e.client.IsConnectionOpen() {
 				log.Infof("Reincarnate: %s\n", topic)
 
 				e.counterMetrics[SPReincarnationAttempts].
