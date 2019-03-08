@@ -145,7 +145,7 @@ func (e *spplugExporter) Collect(ch chan<- prometheus.Metric) {
 	)
 
 	connected := 0.
-	if e.client.IsConnected() {
+	if e.client.IsConnectionOpen() {
 		connected = 1.
 	}
 
