@@ -29,6 +29,8 @@ const (
 	SPReincarnationSuccess  string = "sp_reincarnation_success_count"
 	SPReincarnationDelay    string = "sp_reincarnation_delayed_count"
 
+	NewMetricString			string = "Creating new SP metric %s\n"
+
 	SPReincarnateTimer  uint32 = 900
 	SPReincarnateRetry  uint32 = 60
 	SPReconnectionTimer uint32 = 300
@@ -185,7 +187,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		// Get the labels and value for the labels from the topic and constants
 		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
 
-		if processMetric != true {
+		if !processMetric {
 			return
 		}
 
@@ -237,7 +239,7 @@ func (e *spplugExporter) evaluateEdgeNode(c mqtt.Client, namespace string,
 
 	edgeNode := group + "/" + nodeID
 
-	if _, exists := edgeNodeList[edgeNode]; exists == false {
+	if _, exists := edgeNodeList[edgeNode]; !exists {
 		edgeNodeList[edgeNode] = true
 		e.reincarnate(namespace, group, nodeID)
 	} else {
@@ -306,7 +308,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 	serviceLabels, _ := getServiceLabelSetandValues()
 	nodelabels := getNodeLabelSet()
 
-	log.Debugf("Creating new SP metric %s\n", SPPushTotalMetric)
+	log.Debugf(NewMetricString, SPPushTotalMetric)
 
 	e.counterMetrics[SPPushTotalMetric] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -316,7 +318,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		labels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPLastTimePushedMetric)
+	log.Debugf(NewMetricString, SPLastTimePushedMetric)
 
 	e.metrics[SPLastTimePushedMetric] = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -326,7 +328,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		labels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPConnectionCount)
+	log.Debugf(NewMetricString, SPConnectionCount)
 
 	e.counterMetrics[SPConnectionCount] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -336,7 +338,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		serviceLabels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPDisconnectionCount)
+	log.Debugf(NewMetricString, SPDisconnectionCount)
 
 	e.counterMetrics[SPDisconnectionCount] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -346,7 +348,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		serviceLabels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPReincarnationAttempts)
+	log.Debugf(NewMetricString, SPReincarnationAttempts)
 
 	e.counterMetrics[SPReincarnationAttempts] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -356,7 +358,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		nodelabels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPReincarnationFailures)
+	log.Debugf(NewMetricString, SPReincarnationFailures)
 
 	e.counterMetrics[SPReincarnationFailures] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -366,7 +368,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		nodelabels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPReincarnationSuccess)
+	log.Debugf(NewMetricString, SPReincarnationSuccess)
 
 	e.counterMetrics[SPReincarnationSuccess] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -376,7 +378,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		nodelabels,
 	)
 
-	log.Debugf("Creating new SP metric %s\n", SPReincarnationDelay)
+	log.Debugf(NewMetricString, SPReincarnationDelay)
 
 	e.counterMetrics[SPReincarnationDelay] = prometheus.NewCounterVec(
 		prometheus.CounterOpts{

@@ -11,6 +11,16 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+// contants for various SP labels and metric names
+const (
+	SPNamespace				string = "sp_namespace"
+	SPGroupID				string = "sp_group_id"
+	SPEdgeNodeID			string = "sp_edge_node_id"
+	SPDeviceID				string = "sp_device_id"
+	SPMQTTTopic				string = "sp_mqtt_topic"
+	SPMQTTServer			string = "sp_mqtt_server"
+)
+
 func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
 	topic string) bool {
 
@@ -61,25 +71,25 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	//
 	// The logic for this is that the same metric name could used across
 	// topics (same metric posted for different devices)
-
-	labelValues["sp_namespace"] = parts[0]
-	labelValues["sp_group_id"] = parts[1]
-	labelValues["sp_edge_node_id"] = parts[3]
-	labelValues["sp_device_id"] = parts[4]
+	
+	labelValues[SPNamespace] = parts[0]
+	labelValues[SPGroupID] = parts[1]
+	labelValues[SPEdgeNodeID] = parts[3]
+	labelValues[SPDeviceID] = parts[4]
 
 	return labels, labelValues, true
 }
 
 func getLabelSet() []string {
-	return []string{"sp_namespace", "sp_group_id", "sp_edge_node_id", "sp_device_id"}
+	return []string{SPNamespace, SPGroupID, SPEdgeNodeID, SPDeviceID}
 }
 
 func getServiceLabelSetandValues() ([]string, map[string]string) {
-	labels := []string{"sp_mqtt_topic", "sp_mqtt_server"}
+	labels := []string{SPMQTTTopic, SPMQTTServer}
 
 	labelValues := map[string]string{
-		"sp_mqtt_topic":  *topic,
-		"sp_mqtt_server": *brokerAddress,
+		SPMQTTTopic:  *topic,
+		SPMQTTServer: *brokerAddress,
 	}
 
 	return labels, labelValues
@@ -89,16 +99,16 @@ func getNodeLabelSetandValues(namespace string, group string,
 	nodeID string) ([]string, map[string]string) {
 	labels := getNodeLabelSet()
 	labelValues := map[string]string{
-		"sp_namespace":    namespace,
-		"sp_group_id":     group,
-		"sp_edge_node_id": nodeID,
+		SPNamespace:    namespace,
+		SPGroupID:     group,
+		SPEdgeNodeID: nodeID,
 	}
 
 	return labels, labelValues
 }
 
 func getNodeLabelSet() []string {
-	return []string{"sp_namespace", "sp_group_id", "sp_edge_node_id"}
+	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
