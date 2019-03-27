@@ -14,7 +14,7 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 	exporter.counterMetrics[SPConnectionCount].With(labelValues).Inc()
 }
 
-var disconnectHandler mqtt.ConnectionLostHandler = func(client mqtt.Client,
+var disconnectHandler mqtt.ConnectionLostHandler = func(_ mqtt.Client,
 	err error) {
 	log.Infof("Disconnected from MQTT (%s)\n", err.Error())
 	_, labelValues := getServiceLabelSetandValues()
