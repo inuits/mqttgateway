@@ -27,7 +27,6 @@ func newMQTTExporter() *mqttExporter {
 	options := mqtt.NewClientOptions()
 	log.Infof("Connecting to %v", *brokerAddress)
 	options.AddBroker(*brokerAddress)
-	options.SetAutoReconnect(true)
 	if *username != "" {
 		options.SetUsername(*username)
 	}
