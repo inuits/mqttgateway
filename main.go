@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -15,6 +16,9 @@ var (
 	brokerAddress = kingpin.Flag("mqtt.broker-address", "Address of the MQTT broker.").Default("tcp://localhost:1883").String()
 	topic         = kingpin.Flag("mqtt.topic", "MQTT topic to subscribe to").Default("prometheus/#").String()
 	prefix        = kingpin.Flag("mqtt.prefix", "MQTT topic prefix to remove when creating metrics").Default("prometheus").String()
+	username      = kingpin.Flag("mqtt.username", "MQTT username").Default(os.Getenv("MQTT_USERNAME")).String()
+	password      = kingpin.Flag("mqtt.password", "MQTT password").Default(os.Getenv("MQTT_PASSWORD")).String()
+	clientID      = kingpin.Flag("mqtt.clientid", "MQTT client ID").Default(os.Getenv("MQTT_CLIENT_ID")).String()
 	progname      = "mqttgateway"
 )
 
