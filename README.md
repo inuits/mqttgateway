@@ -6,21 +6,25 @@ A project that subscribes to MQTT queues and published prometheus metrics.
 usage: mqttgateway [<flags>]
 
 Flags:
-  --help                        Show context-sensitive help (also try
---help-long and --help-man).
-  --web.listen-address=":9337"  Address on which to expose metrics and web
-interface.
+  --help                        Show context-sensitive help (also try --help-long and --help-man).
+  --web.listen-address=":9337"  Address on which to expose metrics and web interface.
   --web.telemetry-path="/metrics"
                                 Path under which to expose metrics.
   --mqtt.broker-address="tcp://localhost:1883"
                                 Address of the MQTT broker.
-  --mqtt.topic="prometheus/#"   MQTT topic to subscribe to
-  --mqtt.prefix="prometheus"    MQTT topic prefix to remove when creating
-metrics
-  --log.level="info"            Only log messages with the given severity or
-above. Valid levels: [debug, info, warn, error, fatal]
-  --log.format="logger:stderr"  Set the log target and format. Example:
-"logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"
+                                The default is taken from $MQTT_BROKER_ADDRESS if it is set.
+  --mqtt.topic="prometheus/#"   MQTT topic to subscribe to.
+                                The default is taken from $MQTT_TOPIC if it is set.
+  --mqtt.prefix="prometheus"    MQTT topic prefix to remove when creating metrics.
+                                The default is taken from $MQTT_PREFIX if it is set.
+  --mqtt.username=""            MQTT username.
+                                The default is taken from $MQTT_USERNME if it is set.
+  --mqtt.password=""            MQTT password.
+                                The default is taken from $MQTT_PASSWORD if it is set.
+  --mqtt.clientid=""            MQTT client ID.
+                                The default is taken from $MQTT_CLIENT_ID if it is set.
+  --log.level="info"            Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]
+  --log.format="logger:stderr"  Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"
 ```
 
 ## Installation
