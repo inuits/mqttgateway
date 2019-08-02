@@ -199,10 +199,13 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		// Sparkplug messages contain multiple metrics within them
 		// traverse them and process them
 		metricList := pbMsg.GetMetrics()
-
+		var res string
 		for _, metric := range metricList {
-			metricName := metric.GetName()
+			metricName, err := getMetricName(metric)
+			fmt.Println(err, " ", metricName, " not found")
+			#TODO err handling
 
+			fmt.Println(res)
 			if _, ok := e.metrics[metricName]; !ok {
 				eventString = "Creating metric"
 

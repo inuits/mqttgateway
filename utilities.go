@@ -3,6 +3,9 @@ package main
 import (
 	"errors"
 	"strings"
+	"bytes"
+	"fmt"
+	"regexp"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -71,7 +74,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	//
 	// The logic for this is that the same metric name could used across
 	// topics (same metric posted for different devices)
-	
+
 	labelValues[SPNamespace] = parts[0]
 	labelValues[SPGroupID] = parts[1]
 	labelValues[SPEdgeNodeID] = parts[3]
@@ -109,6 +112,22 @@ func getNodeLabelSetandValues(namespace string, group string,
 
 func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
+}
+
+func getMetricName(metric *pb.Payload_Metric) (string, error) {
+	metricName := metric.GetName()
+
+	var errUnexpectedType = errors.New("Metrics is not in prometheus")
+	match, _ := regexp.MatchString("[a-zA-Z_:][a-zA-Z0-9_:]*", metricName)
+  fmt.Println(match)
+	if match == true{
+		return metricname
+
+	}else {
+		log.Debugf("Error in %v data type format for metric %s\n",
+			err, metricname)
+	}
+
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
