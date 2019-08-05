@@ -24,6 +24,8 @@ const (
 	SPConnectionCount      string = "sp_connection_established_count"
 	SPDisconnectionCount   string = "sp_connection_lost_count"
 
+	SPPushNewMetric        string = "sp_new_metrics_pushed"     //# adding new unknown metric
+
 	SPReincarnationAttempts string = "sp_reincarnation_attempt_count"
 	SPReincarnationFailures string = "sp_reincarnation_failure_count"
 	SPReincarnationSuccess  string = "sp_reincarnation_success_count"
@@ -198,14 +200,25 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 		// Sparkplug messages contain multiple metrics within them
 		// traverse them and process them
-		metricList := pbMsg.GetMetrics()
-		var res string
-		for _, metric := range metricList {
-			metricName, err := getMetricName(metric)
-			fmt.Println(err, " ", metricName, " not found")
-			#TODO err handling
 
-			fmt.Println(res)
+		metricList := pbMsg.GetMetrics()
+
+		for _, metric := range metricList {
+
+			metricName, err := getMetricName(metric)
+			if  err != nil{
+				log.Debugf("Error: %s %v  \n", metricName, err)
+			}else{
+				eventString = "Unknown metric"
+				if metricVal, err := convertMetricToFloat(metric); err == nil{
+					log.Debugf("%s %s : %g\n", eventString, metricName, metricVal)
+					e.metrics[metricName].With(labelValues).Set(metricVal)
+					e.metrics[SPLastTimePushedMetric].With(labelValues).SetToCurrentTime()
+					e.counterMetrics[SPPushNewMetric].With(labelValues).Inc()
+				}
+			}
+
+			// fmt.Println(matchRes)
 			if _, ok := e.metrics[metricName]; !ok {
 				eventString = "Creating metric"
 
