@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"strings"
-	// "fmt"
 	"regexp"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
@@ -113,20 +112,19 @@ func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
 }
 
-func getMetricName(metric *pb.Payload_Metric) (string, error){
+func getMetricName(metric *pb.Payload_Metric) (string, error) {
 
 	metricName := metric.GetName()
-	var errUnexpectedType = errors.New("Metrics does not matches with prometheus")
+	var errUnexpectedType error
 	match, _ := regexp.MatchString("[a-zA-Z_:][a-zA-Z0-9_:]*", metricName)
-	if match == true{
-		return metricName, nil
-		}else {
+	if match == true {
+		errUnexpectedType = nil
+		} else {
 			log.Debugf("Error in %v data type format for metric %s\n",errUnexpectedType, metricName)
-			return metricName,errUnexpectedType
+			errUnexpectedType = errors.New("Metric name does not comply with Prometheus naming standards")
 		}
-	}
-
-
+	return metricName, errUnexpectedType
+}
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
 	var errUnexpectedType = errors.New("Non-numeric type could not be converted to float")

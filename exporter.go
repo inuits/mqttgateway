@@ -23,8 +23,7 @@ const (
 	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
 	SPConnectionCount      string = "sp_connection_established_count"
 	SPDisconnectionCount   string = "sp_connection_lost_count"
-
-	SPPushNewMetric        string = "sp_new_metrics_pushed"     //# adding new unknown metric
+	SPPushInvalidMetric    string = "sp_invalid_metric_name_received"
 
 	SPReincarnationAttempts string = "sp_reincarnation_attempt_count"
 	SPReincarnationFailures string = "sp_reincarnation_failure_count"
@@ -206,19 +205,12 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		for _, metric := range metricList {
 
 			metricName, err := getMetricName(metric)
-			if  err != nil{
-				log.Debugf("Error: %s %v  \n", metricName, err)
-			}else{
-				eventString = "Unknown metric"
-				if metricVal, err := convertMetricToFloat(metric); err == nil{
-					log.Debugf("%s %s : %g\n", eventString, metricName, metricVal)
-					e.metrics[metricName].With(labelValues).Set(metricVal)
-					e.metrics[SPLastTimePushedMetric].With(labelValues).SetToCurrentTime()
-					e.counterMetrics[SPPushNewMetric].With(labelValues).Inc()
-				}
+			if  err != nil {
+				log.Errorf("Error: %s %s %v  \n", labelValues["sp_edge_node_id"], metricName, err)
+				e.counterMetrics[SPPushInvalidMetric].With(labelValues).Inc()
+				continue
 			}
-
-			// fmt.Println(matchRes)
+			
 			if _, ok := e.metrics[metricName]; !ok {
 				eventString = "Creating metric"
 
