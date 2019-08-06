@@ -203,15 +203,14 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		metricList := pbMsg.GetMetrics()
 
 		for _, metric := range metricList {
-
 			metricName, err := getMetricName(metric)
 			if  err != nil {
 				log.Errorf("Error: %s %s %v  \n", labelValues["sp_edge_node_id"], metricName, err)
 				e.counterMetrics[SPPushInvalidMetric].With(labelValues).Inc()
 				continue
 			}
-			
 			if _, ok := e.metrics[metricName]; !ok {
+
 				eventString = "Creating metric"
 
 				e.metrics[metricName] = prometheus.NewGaugeVec(
@@ -352,6 +351,16 @@ func (e *spplugExporter) initializeMetricsAndData() {
 		prometheus.CounterOpts{
 			Name: SPDisconnectionCount,
 			Help: fmt.Sprintf("Total MQTT disconnections"),
+		},
+		serviceLabels,
+	)
+
+	log.Debugf(NewMetricString, SPPushInvalidMetric)
+
+	e.counterMetrics[SPPushInvalidMetric] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPPushInvalidMetric,
+			Help: fmt.Sprintf("Non-compliant prometheus metrics added in the list"),
 		},
 		serviceLabels,
 	)

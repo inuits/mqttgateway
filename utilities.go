@@ -112,17 +112,18 @@ func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
 }
 
-func getMetricName(metric *pb.Payload_Metric) (string, error) {
+func getMetricName(metric *pb.Payload_Metric)(string, error) {
 
 	metricName := metric.GetName()
+
 	var errUnexpectedType error
 	match, _ := regexp.MatchString("[a-zA-Z_:][a-zA-Z0-9_:]*", metricName)
 	if match == true {
 		errUnexpectedType = nil
-		} else {
-			log.Debugf("Error in %v data type format for metric %s\n",errUnexpectedType, metricName)
-			errUnexpectedType = errors.New("Metric name does not comply with Prometheus naming standards")
-		}
+	} else {
+		log.Debugf("Error in %v data type format for metric %s\n",errUnexpectedType, metricName)
+		errUnexpectedType = errors.New("Metric name does not comply with Prometheus naming standards")
+	}
 	return metricName, errUnexpectedType
 }
 
