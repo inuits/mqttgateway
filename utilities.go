@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"strings"
-	"regexp"
+	//"regexp"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/log"
 )
 
@@ -113,18 +114,17 @@ func getNodeLabelSet() []string {
 }
 
 func getMetricName(metric *pb.Payload_Metric)(string, error) {
-
-	metricName := metric.GetName()
-
 	var errUnexpectedType error
-	match, _ := regexp.MatchString("[a-zA-Z_:][a-zA-Z0-9_:]*", metricName)
-	if match == true {
+
+	metricName := model.LabelValue(metric.GetName())
+
+	if  model.IsValidMetricName(metricName) == true {
 		errUnexpectedType = nil
 	} else {
-		log.Debugf("Error in %v data type format for metric %s\n",errUnexpectedType, metricName)
-		errUnexpectedType = errors.New("Metric name does not comply with Prometheus naming standards")
+		errUnexpectedType = errors.New("Non-compliant metric name")
 	}
-	return metricName, errUnexpectedType
+
+	return string(metricName), errUnexpectedType
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
