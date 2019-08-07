@@ -23,6 +23,7 @@ const (
 	SPLastTimePushedMetric string = "sp_last_pushed_timestamp"
 	SPConnectionCount      string = "sp_connection_established_count"
 	SPDisconnectionCount   string = "sp_connection_lost_count"
+	SPPushInvalidMetric    string = "sp_invalid_metric_name_received"
 
 	SPReincarnationAttempts string = "sp_reincarnation_attempt_count"
 	SPReincarnationFailures string = "sp_reincarnation_failure_count"
@@ -185,25 +186,36 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		log.Debugf("%s\n", pbMsg.String())
 
 		// Get the labels and value for the labels from the topic and constants
-		labels, labelValues, processMetric := prepareLabelsAndValues(topic)
+		siteLabels, siteLabelValues, processMetric := prepareLabelsAndValues(topic)
 
 		if !processMetric {
 			return
 		}
 
 		// Process this edge node, if it is unique start the re-birth process
-		e.evaluateEdgeNode(c, labelValues["sp_namespace"],
-			labelValues["sp_group_id"],
-			labelValues["sp_edge_node_id"])
+		e.evaluateEdgeNode(c, siteLabelValues["sp_namespace"],
+			siteLabelValues["sp_group_id"],
+			siteLabelValues["sp_edge_node_id"])
 
 		// Sparkplug messages contain multiple metrics within them
 		// traverse them and process them
+
 		metricList := pbMsg.GetMetrics()
 
 		for _, metric := range metricList {
-			metricName := metric.GetName()
+			metricName, err := getMetricName(metric)
+
+			if  err != nil {
+				if metricName != "Device Control/Rebirth" {
+					log.Errorf("Error: %s %s %v  \n", 	siteLabelValues["sp_edge_node_id"], metricName, err)
+					e.counterMetrics[SPPushInvalidMetric].With(siteLabelValues).Inc()
+				}
+
+				continue
+			}
 
 			if _, ok := e.metrics[metricName]; !ok {
+
 				eventString = "Creating metric"
 
 				e.metrics[metricName] = prometheus.NewGaugeVec(
@@ -211,7 +223,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 						Name: metricName,
 						Help: "Metric pushed via MQTT",
 					},
-					labels,
+					siteLabels,
 				)
 			} else {
 				eventString = "Updating metric"
@@ -222,9 +234,9 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					err, metricName)
 			} else {
 				log.Debugf("%s %s : %g\n", eventString, metricName, metricVal)
-				e.metrics[metricName].With(labelValues).Set(metricVal)
-				e.metrics[SPLastTimePushedMetric].With(labelValues).SetToCurrentTime()
-				e.counterMetrics[SPPushTotalMetric].With(labelValues).Inc()
+				e.metrics[metricName].With(siteLabelValues).Set(metricVal)
+				e.metrics[SPLastTimePushedMetric].With(siteLabelValues).SetToCurrentTime()
+				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
 			}
 		}
 	}
@@ -304,9 +316,9 @@ func (e *spplugExporter) initializeMetricsAndData() {
 
 	edgeNodeList = make(map[string]bool)
 
-	labels := getLabelSet()
+	siteLabels := getLabelSet()
 	serviceLabels, _ := getServiceLabelSetandValues()
-	nodelabels := getNodeLabelSet()
+	edgeNodeLabels := getNodeLabelSet()
 
 	log.Debugf(NewMetricString, SPPushTotalMetric)
 
@@ -315,7 +327,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPPushTotalMetric,
 			Help: fmt.Sprintf("Number of messages published on a MQTT topic"),
 		},
-		labels,
+		siteLabels,
 	)
 
 	log.Debugf(NewMetricString, SPLastTimePushedMetric)
@@ -325,7 +337,17 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPLastTimePushedMetric,
 			Help: fmt.Sprintf("Last time a metric was pushed to a MQTT topic"),
 		},
-		labels,
+		siteLabels,
+	)
+
+	log.Debugf(NewMetricString, SPPushInvalidMetric)
+
+	e.counterMetrics[SPPushInvalidMetric] = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: SPPushInvalidMetric,
+			Help: fmt.Sprintf("Total non-compliant metric names received"),
+		},
+		siteLabels,
 	)
 
 	log.Debugf(NewMetricString, SPConnectionCount)
@@ -355,7 +377,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPReincarnationAttempts,
 			Help: fmt.Sprintf("Total NCMD message attempts"),
 		},
-		nodelabels,
+		edgeNodeLabels,
 	)
 
 	log.Debugf(NewMetricString, SPReincarnationFailures)
@@ -365,7 +387,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPReincarnationFailures,
 			Help: fmt.Sprintf("Total NCMD message failures"),
 		},
-		nodelabels,
+		edgeNodeLabels,
 	)
 
 	log.Debugf(NewMetricString, SPReincarnationSuccess)
@@ -375,7 +397,7 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPReincarnationSuccess,
 			Help: fmt.Sprintf("Total successful NCMD attempts"),
 		},
-		nodelabels,
+		edgeNodeLabels,
 	)
 
 	log.Debugf(NewMetricString, SPReincarnationDelay)
@@ -385,6 +407,6 @@ func (e *spplugExporter) initializeMetricsAndData() {
 			Name: SPReincarnationDelay,
 			Help: fmt.Sprintf("Total delayed NCMD attempts due to connection issues"),
 		},
-		nodelabels,
+		edgeNodeLabels,
 	)
 }
