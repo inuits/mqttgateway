@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"strings"
-	//"regexp"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
