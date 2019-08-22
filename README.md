@@ -18,7 +18,7 @@ Flags:
   --mqtt.prefix="prometheus"    MQTT topic prefix to remove when creating metrics.
                                 The default is taken from $MQTT_PREFIX if it is set.
   --mqtt.username=""            MQTT username.
-                                The default is taken from $MQTT_USERNME if it is set.
+                                The default is taken from $MQTT_USERNAME if it is set.
   --mqtt.password=""            MQTT password.
                                 The default is taken from $MQTT_PASSWORD if it is set.
   --mqtt.clientid=""            MQTT client ID.
@@ -46,9 +46,9 @@ The format for the topics is as follow:
 
 `prefix/LABEL1/VALUE1/LABEL2/VALUE2/NAME`
 
-A topic `prometheus/job/ESP8266/instance/livingroom/temperature_celcius` would
+A topic `prometheus/job/ESP8266/instance/livingroom/temperature_celsius` would
 be converted to a metric
-`temperature_celcius{job="ESP8266",instance="livingroom"}`.
+`temperature_celsius{job="ESP8266",instance="livingroom"}`.
 
 If labelnames differ for a same metric, then we invalidate existing metrics and
 only keep new ones. Then we issue a warning in the logs. You should avoid it.
@@ -66,11 +66,11 @@ This project does not support authentication yet but that is planned.
 ## Example
 
 ```
-$ mosquitto_pub -m 20.2 -t prometheus/job/ESP8266/instance/livingroom/temperature_celcius
-$ curl -s http://127.0.0.1:9337/metrics|grep temperature_celcius|grep -v '#'
-mqtt_temperature_celcius_last_pushed_timestamp{instance="livingroom",job="ESP8266"} 1.525185129171293e+09
-mqtt_temperature_celcius_push_total{instance="livingroom",job="ESP8266"} 1
-temperature_celcius{instance="livingroom",job="ESP8266"} 20.2
+$ mosquitto_pub -m 20.2 -t prometheus/job/ESP8266/instance/livingroom/temperature_celsius
+$ curl -s http://127.0.0.1:9337/metrics|grep temperature_celsius|grep -v '#'
+mqtt_temperature_celsius_last_pushed_timestamp{instance="livingroom",job="ESP8266"} 1.525185129171293e+09
+mqtt_temperature_celsius_push_total{instance="livingroom",job="ESP8266"} 1
+temperature_celsius{instance="livingroom",job="ESP8266"} 20.2
 ```
 
 ## A note about the prometheus config
