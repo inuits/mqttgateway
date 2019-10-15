@@ -8,6 +8,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/log"
 )
 
@@ -71,7 +72,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	//
 	// The logic for this is that the same metric name could used across
 	// topics (same metric posted for different devices)
-	
+
 	labelValues[SPNamespace] = parts[0]
 	labelValues[SPGroupID] = parts[1]
 	labelValues[SPEdgeNodeID] = parts[3]
@@ -109,6 +110,20 @@ func getNodeLabelSetandValues(namespace string, group string,
 
 func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
+}
+
+func getMetricName(metric *pb.Payload_Metric)(string, error) {
+	var errUnexpectedType error
+
+	metricName := model.LabelValue(metric.GetName())
+
+	if  model.IsValidMetricName(metricName) == true {
+		errUnexpectedType = nil
+	} else {
+		errUnexpectedType = errors.New("Non-compliant metric name")
+	}
+
+	return string(metricName), errUnexpectedType
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
