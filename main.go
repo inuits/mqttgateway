@@ -47,7 +47,7 @@ func main() {
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
 
-	exporter = initSparkPlugExporter()
+	initSparkPlugExporter(&exporter)
 	prometheus.MustRegister(exporter)
 
 	http.Handle(*metricsPath, promhttp.Handler())

@@ -68,7 +68,7 @@ type spplugExporter struct {
 }
 
 // Initialize
-func initSparkPlugExporter() *spplugExporter {
+func initSparkPlugExporter(e **spplugExporter) {
 
 	if *mqttDebug == "true" {
 		mqtt.ERROR = oslog.New(os.Stdout, "MQTT ERROR    ", oslog.Ltime)
@@ -98,11 +98,8 @@ func initSparkPlugExporter() *spplugExporter {
 	// Set capabilities
 	options.SetAutoReconnect(true)
 
-	m := mqtt.NewClient(options)
-
 	// create an exporter
-	e := &spplugExporter{
-		client: m,
+	*e = &spplugExporter{
 		versionDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(progname, "build", "info"),
 			"Build info of this instance", nil,
@@ -111,17 +108,18 @@ func initSparkPlugExporter() *spplugExporter {
 			prometheus.BuildFQName(progname, "mqtt", "connected"),
 			"Is the exporter connected to mqtt broker", nil, nil),
 	}
+	
+	(*e).client = mqtt.NewClient(options)
 
 	log.Debugf("Initializing Exporter Metrics and Data\n")
 
-	e.initializeMetricsAndData()
+	(*e).initializeMetricsAndData()
 
-	if token := m.Connect(); token.Wait() && token.Error() != nil {
+	if token := (*e).client.Connect(); token.Wait() && token.Error() != nil {
 		log.Fatal(token.Error())
 	}
 
-	m.Subscribe(*topic, 2, e.receiveMessage())
-	return e
+	(*e).client.Subscribe(*topic, 2, (*e).receiveMessage())
 }
 
 func (e *spplugExporter) Describe(ch chan<- *prometheus.Desc) {
