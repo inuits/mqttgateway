@@ -18,6 +18,7 @@ const (
 	SPGroupID				string = "sp_group_id"
 	SPEdgeNodeID			string = "sp_edge_node_id"
 	SPDeviceID				string = "sp_device_id"
+	SPkeyID					string = "sp_key_id"
 	SPMQTTTopic				string = "sp_mqtt_topic"
 	SPMQTTServer			string = "sp_mqtt_server"
 )
@@ -77,12 +78,16 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	labelValues[SPGroupID] = parts[1]
 	labelValues[SPEdgeNodeID] = parts[3]
 	labelValues[SPDeviceID] = parts[4]
+	if len(parts)>5{
+		labelValues[SPkeyID] = parts[5]
+	}
+
 
 	return labels, labelValues, true
 }
 
 func getLabelSet() []string {
-	return []string{SPNamespace, SPGroupID, SPEdgeNodeID, SPDeviceID}
+	return []string{SPNamespace, SPGroupID, SPEdgeNodeID, SPDeviceID, SPkeyID}
 }
 
 func getServiceLabelSetandValues() ([]string, map[string]string) {
