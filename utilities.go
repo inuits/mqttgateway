@@ -44,13 +44,14 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	t := strings.TrimPrefix(topic, *prefix)
 	t = strings.TrimPrefix(t, "/")
 	parts := strings.Split(t, "/")
+	log.Debugf("first test to check the lengh for Metricx: %s\n", parts)
 
 	// 6.1.3 covers 9 message types, only process device data
 	// Sparkplug puts 5 key namespacing elements in the topic name
 	// these are being parsed and will be added as metric labels
 
 	if (parts[2] == "DDATA") || (parts[2] == "DBIRTH") {
-		if len(parts) != 5 {
+		if len(parts) != 6 {
 			log.Debugf("Ignoring topic %s, does not comply with Sparkspec\n", t)
 			return nil, nil, false
 		}
@@ -121,6 +122,7 @@ func getMetricName(metric *pb.Payload_Metric)(string, error) {
 	var errUnexpectedType error
 
 	metricName := model.LabelValue(metric.GetName())
+	log.Infof("Received message for testt: %s\n", metricName)
 
 	if  model.IsValidMetricName(metricName) == true {
 		errUnexpectedType = nil
