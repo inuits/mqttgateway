@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strings"
+	"reflect"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -109,7 +111,7 @@ func initSparkPlugExporter(e **spplugExporter) {
 			prometheus.BuildFQName(progname, "mqtt", "connected"),
 			"Is the exporter connected to mqtt broker", nil, nil),
 	}
-	
+
 	(*e).client = mqtt.NewClient(options)
 
 	log.Debugf("Initializing Exporter Metrics and Data\n")
@@ -187,6 +189,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		siteLabels, siteLabelValues, processMetric := prepareLabelsAndValues(topic)
 
 		if !processMetric {
+			log.Infof("returning the backstate")
 			return
 		}
 
@@ -198,11 +201,29 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		// Sparkplug messages contain multiple metrics within them
 		// traverse them and process them
 
+		log.Infof("type for siteLabels: %s\n", reflect.TypeOf(siteLabels))
+		log.Infof("type for siteLabels: %s\n", reflect.TypeOf(siteLabelValues))
+		// metricLabelValues = siteLabelValues
+
 		metricList := pbMsg.GetMetrics()
-
+		log.Infof("Received message in processMetric: %s\n", metricList)
 		for _, metric := range metricList {
-			metricName, err := getMetricName(metric)
 
+			metricLabels := siteLabels
+			metricLabelValues := siteLabelValues
+
+			log.Infof("Received message in loop for metricName: %s\n", metric)
+			newLabelname, metricName, err := getMetricName(metric)
+			if newLabelname!=nil {
+				for list := 0; list < len(newLabelname); list++ {
+					parts := strings.Split(newLabelname[list], ":")
+
+					metricLabels = append(metricLabels, parts[0])
+					metricLabelValues[parts[0]] = string(parts[1])
+				}
+			}
+
+			log.Infof("Received message in loop for metricName: %s siteLabels: %s metricLabelValues: %s\n", metric, metricLabels, metricLabelValues)
 			if  err != nil {
 				if metricName != "Device Control/Rebirth" {
 					log.Errorf("Error: %s %s %v  \n", 	siteLabelValues["sp_edge_node_id"], metricName, err)
@@ -211,7 +232,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 				continue
 			}
-
+			log.Debugf("e.metrics[metricName] : %v", *e)
 			if _, ok := e.metrics[metricName]; !ok {
 
 				eventString = "Creating metric"
@@ -221,20 +242,23 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 						Name: metricName,
 						Help: "Metric pushed via MQTT",
 					},
-					siteLabels,
+					metricLabels,
 				)
 			} else {
 				eventString = "Updating metric"
 			}
-
+			log.Debugf("e.metrics[metricName] : %v", e.metrics[metricName])
 			if metricVal, err := convertMetricToFloat(metric); err != nil {
 				log.Debugf("Error %v converting data type for metric %s\n",
 					err, metricName)
 			} else {
-				log.Debugf("%s %s : %g\n", eventString, metricName, metricVal)
-				e.metrics[metricName].With(siteLabelValues).Set(metricVal)
+
+
+				log.Debugf("love you: %s %s : %g\n", eventString, metricName, metricVal)
+				e.metrics[metricName].With(metricLabelValues).Set(metricVal)
 				e.metrics[SPLastTimePushedMetric].With(siteLabelValues).SetToCurrentTime()
 				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
+
 			}
 		}
 	}

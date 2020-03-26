@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"strings"
+	"reflect"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -41,17 +42,18 @@ func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
 }
 
 func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
+	var labels []string
 	t := strings.TrimPrefix(topic, *prefix)
 	t = strings.TrimPrefix(t, "/")
 	parts := strings.Split(t, "/")
-	log.Debugf("first test to check the lengh for Metricx: %s\n", parts)
+	log.Debugf("first test to check the lengh for Metricx: %s: %d\n", parts, len(parts))
 
 	// 6.1.3 covers 9 message types, only process device data
 	// Sparkplug puts 5 key namespacing elements in the topic name
 	// these are being parsed and will be added as metric labels
 
 	if (parts[2] == "DDATA") || (parts[2] == "DBIRTH") {
-		if len(parts) != 6 {
+		if len(parts) != 5 {
 			log.Debugf("Ignoring topic %s, does not comply with Sparkspec\n", t)
 			return nil, nil, false
 		}
@@ -62,9 +64,11 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 
 	/* See the sparkplug definition for the topic construction */
 	/** Set the Prometheus labels to their corresponding topic part **/
+	if labels == nil {
+		labels = getLabelSet()
+	}
 
-	var labels = getLabelSet()
-
+	log.Infof("prometheus.Labels{}: %s\n", prometheus.Labels{})
 	labelValues := prometheus.Labels{}
 
 	// Labels are created from the topic parsing above and compared against
@@ -79,16 +83,12 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	labelValues[SPGroupID] = parts[1]
 	labelValues[SPEdgeNodeID] = parts[3]
 	labelValues[SPDeviceID] = parts[4]
-	if len(parts)>5{
-		labelValues[SPkeyID] = parts[5]
-	}
-
 
 	return labels, labelValues, true
 }
 
 func getLabelSet() []string {
-	return []string{SPNamespace, SPGroupID, SPEdgeNodeID, SPDeviceID, SPkeyID}
+	return []string{SPNamespace, SPGroupID, SPEdgeNodeID, SPDeviceID}
 }
 
 func getServiceLabelSetandValues() ([]string, map[string]string) {
@@ -118,19 +118,31 @@ func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
 }
 
-func getMetricName(metric *pb.Payload_Metric)(string, error) {
+func getMetricName(metric *pb.Payload_Metric)([]string, string, error) {
 	var errUnexpectedType error
+	var labelvalues []string
+	log.Info("data checked",(reflect.TypeOf(metric.GetName())))
+	metricName := metric.GetName()
 
-	metricName := model.LabelValue(metric.GetName())
-	log.Infof("Received message for testt: %s\n", metricName)
+	if strings.Contains(metricName, "/")  == true && metricName != "Device Control/Rebirth"{
+		parts := strings.Split(metricName, "/")
+		size:= len(parts)
+		metricName = parts[size-1]
+		for metlen := 0; metlen <= size-2; metlen++ {
+			labelvalues = append(labelvalues, parts[metlen])
 
-	if  model.IsValidMetricName(metricName) == true {
+		}
+	log.Infof("Received message for labelvalues: %s\n", labelvalues)
+	}
+	metricNameL := model.LabelValue(metricName)
+
+	if  model.IsValidMetricName(metricNameL) == true {
 		errUnexpectedType = nil
 	} else {
 		errUnexpectedType = errors.New("Non-compliant metric name")
 	}
 
-	return string(metricName), errUnexpectedType
+	return []string(labelvalues), string(metricNameL), errUnexpectedType
 }
 
 func convertMetricToFloat(metric *pb.Payload_Metric) (float64, error) {
