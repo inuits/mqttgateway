@@ -41,6 +41,17 @@ func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
 	return true
 }
 
+func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
+	newLabels := prometheus.Labels{}
+
+	for key, value := range labels {
+	  newLabels[key] = value
+	}
+	
+	return newLabels
+}
+
+
 func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	var labels []string
 	t := strings.TrimPrefix(topic, *prefix)
