@@ -59,33 +59,49 @@ const (
 	PBPropertySetList   uint32 = 21
 )
 
+type prometheusmetric struct {
+    prommetric   *prometheus.GaugeVec
+    promlabel    prometheus.Labels
+}
+
 type spplugExporter struct {
 	client      mqtt.Client
 	versionDesc *prometheus.Desc
 	connectDesc *prometheus.Desc
 
 	// Holds the mertrics collected
-	metrics        map[string]*prometheus.GaugeVec
-	
+	metrics     map[string] []prometheusmetric
+
+
+	// [ess_seq
+	// 	- prometheus.Labels{}
+	// 	- prometheus.GaugeVec,
+	// ess_b
+	// 	- prometheus.Labels{}
+	// 	- prometheus.GaugeVec,
+	// ]
+
+
+
 	// [metricName]
 	// - prometheus.Labels{}
 	//   *prometheus.GaugeVec
-	// - 
 	// -
 	// -
-	// 
+	// -
+	//
 	// [ess_seq]
 	// - ["comptest"]
-	//    Metric Pointer 
+	//    Metric Pointer
 	// - ["jason", "bob"]
 	//   Metric Pointer
-	// - NEW ENtRY 
-	
+	// - NEW ENtRY
+
 	// map: key metricName value: array new a new datastruture
-	{ 
-		prometheus.Labels{}
-		*prometheus.GaugeVec
-	}
+	// {
+	// 	prometheus.Labels{}
+	// 	*prometheus.GaugeVec
+	// }
 	counterMetrics map[string]*prometheus.CounterVec
 }
 
@@ -152,8 +168,11 @@ func (e *spplugExporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, m := range e.counterMetrics {
 		m.Describe(ch)
 	}
-	for _, m := range e.metrics {
-		m.Describe(ch)
+	for k := range e.metrics{
+		for _, ma:= range e.metrics[k]{
+			ma.prommetric.Describe(ch)
+		}
+
 	}
 }
 
@@ -181,8 +200,11 @@ func (e *spplugExporter) Collect(ch chan<- prometheus.Metric) {
 		m.Collect(ch)
 	}
 
-	for _, m := range e.metrics {
-		m.Collect(ch)
+	for k := range e.metrics{
+		for _, ma:= range e.metrics[k]{
+			ma.prommetric.Collect(ch)
+		}
+
 	}
 }
 
@@ -190,7 +212,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 	return func(c mqtt.Client, m mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
-
+		var newMetric prometheusmetric
 		var pbMsg pb.Payload
 		var eventString string
 
@@ -208,7 +230,6 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		siteLabels, siteLabelValues, processMetric := prepareLabelsAndValues(topic)
 
 		if !processMetric {
-			log.Infof("returning the backstate")
 			return
 		}
 
@@ -223,14 +244,14 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 			metricLabels := siteLabels
 			metricLabelValues := cloneLabelSet(siteLabelValues)
-			
-			log.Debugf("Check the data structures: (%x %x)",
-			 		   siteLabelValues, metricLabelValues)
+			//
+			// log.Debugf("Check the data structures: (%x %x)",
+			//  		   siteLabelValues, metricLabelValues)
 
 			newLabelname, metricName, err := getMetricName(metric)
 
 			log.Infof("Received message for metric: %s", metricName)
-			
+
 			if newLabelname!=nil {
 				for list := 0; list < len(newLabelname); list++ {
 					parts := strings.Split(newLabelname[list], ":")
@@ -252,18 +273,35 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			// if metricName is not within the e.metrics OR
 			// if metricLabels (note you will need a function to compare maps) is not within e.metrics[metricName], then you need to create a new metric
 			_, metricNameExists := e.metrics[metricName]
+			var boollabel bool
+			var labelindex int
 
-			if (!metricNameExists ||
-			   (!compareLabelSet(e.metrics[metricName], metricLabels))) {
+			if (metricNameExists){
+				boollabel = false
+				for index := range e.metrics[metricName]{
+					if compareLabelSet(e.metrics[metricName][index].promlabel, metricLabels) == true{
+						eventString = "Updating metric"
+						boollabel = true
+						labelindex = index
+					}
+				}
+
+				if boollabel == false{
+					e.metrics[metricName][labelindex].promlabel = metricLabelValues
+					log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][labelindex].promlabel, metricLabelValues)
+				}
+			} else if (!metricNameExists){
+			  /* (!compareLabelSet(e.metrics[metricName].promlabel, metricLabels))) {*/
 				eventString = "Creating metric"
-
-				e.metrics[metricName] = prometheus.NewGaugeVec(
+				// e.metrics[metricName] = append(e.metrics[metricName], *prometheusmetric)
+				newMetric.prommetric  = prometheus.NewGaugeVec(
 					prometheus.GaugeOpts{
 						Name: metricName,
 						Help: "Metric pushed via MQTT",
 					},
 					metricLabels,
 				)
+				e.metrics[metricName] = append(e.metrics[metricName], newMetric)
 			} else {
 				eventString = "Updating metric"
 			}
@@ -276,9 +314,15 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 							eventString, metricName, metricVal, metricLabels, metricLabelValues)
 
 			    // NEED to reference e.metric[metricName][metricLabels]
-				e.metrics[metricName].With(metricLabelValues).Set(metricVal)
-				e.metrics[SPLastTimePushedMetric].With(siteLabelValues).SetToCurrentTime()
-				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
+				for index := range e.metrics[metricName]{
+
+					e.metrics[metricName][index].prommetric.With(metricLabelValues).Set(metricVal)
+					e.metrics[SPLastTimePushedMetric][index].prommetric.With(siteLabelValues).SetToCurrentTime()
+					e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
+				}
+				if len(e.metrics[metricName])>0{
+					log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][0].promlabel, metricLabels)
+				}
 			}
 		}
 	}
@@ -353,7 +397,8 @@ func (e *spplugExporter) reincarnate(namespace string, group string,
 
 func (e *spplugExporter) initializeMetricsAndData() {
 
-	e.metrics = make(map[string]*prometheus.GaugeVec)
+	// e.metrics = make(map[string]*prometheus.GaugeVec)
+	e.metrics = make(map[string] []prometheusmetric)
 	e.counterMetrics = make(map[string]*prometheus.CounterVec)
 
 	edgeNodeList = make(map[string]bool)
@@ -373,14 +418,15 @@ func (e *spplugExporter) initializeMetricsAndData() {
 	)
 
 	log.Debugf(NewMetricString, SPLastTimePushedMetric)
-
-	e.metrics[SPLastTimePushedMetric] = prometheus.NewGaugeVec(
+	var test prometheusmetric
+	test.prommetric= prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: SPLastTimePushedMetric,
 			Help: fmt.Sprintf("Last time a metric was pushed to a MQTT topic"),
 		},
 		siteLabels,
 	)
+	e.metrics[SPLastTimePushedMetric] = append(e.metrics[SPLastTimePushedMetric], test)
 
 	log.Debugf(NewMetricString, SPPushInvalidMetric)
 

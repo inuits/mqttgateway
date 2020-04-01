@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"reflect"
+	// "fmt"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -47,10 +48,20 @@ func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
 	for key, value := range labels {
 	  newLabels[key] = value
 	}
-	
+
 	return newLabels
 }
 
+func compareLabelSet(testlabels prometheus.Labels, metricLabels []string) (bool) {
+	for key := range testlabels {
+		for km := range metricLabels{
+			if testlabels[key] == metricLabels[km] {
+				return true
+		}
+		}
+	}
+	return false
+}
 
 func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	var labels []string
