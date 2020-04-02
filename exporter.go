@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 	"strings"
+	"reflect"
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -61,7 +62,7 @@ const (
 
 type prometheusmetric struct {
     prommetric   *prometheus.GaugeVec
-    promlabel    prometheus.Labels
+    promlabel    []string
 }
 
 type spplugExporter struct {
@@ -245,8 +246,8 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			metricLabels := siteLabels
 			metricLabelValues := cloneLabelSet(siteLabelValues)
 			//
-			// log.Debugf("Check the data structures: (%x %x)",
-			//  		   siteLabelValues, metricLabelValues)
+			log.Debugf("Check the data structures: %v : %v",
+			 		   reflect.ValueOf(metricLabels), reflect.ValueOf(siteLabels))
 
 			newLabelname, metricName, err := getMetricName(metric)
 
@@ -279,7 +280,8 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			if (metricNameExists){
 				boollabel = false
 				for index := range e.metrics[metricName]{
-					if compareLabelSet(e.metrics[metricName][index].promlabel, metricLabels) == true{
+					// compareLabelSet(e.metrics[metricName][index].promlabel, metricLabels) == true
+					if len(metricLabels) == len(e.metrics[metricName][index].promlabel) {
 						eventString = "Updating metric"
 						boollabel = true
 						labelindex = index
@@ -287,20 +289,35 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				}
 
 				if boollabel == false{
-					e.metrics[metricName][labelindex].promlabel = metricLabelValues
-					log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][labelindex].promlabel, metricLabelValues)
+
+					for index := range metricLabels{
+						newMetric.promlabel = append(newMetric.promlabel , metricLabels[index])
+					}
+					eventString = "Creating lable with old metric"
+					newMetric.prommetric = createNewMetric(metricName , metricLabels)
+
+					e.metrics[metricName] = append(e.metrics[metricName], newMetric)
+
+					// var newlableadd []string
+					// newlableadd =append(newlableadd , metricLabels)
+					// e.metrics[metricName][labelindex].promlabel = append(e.metrics[metricName][labelindex].promlabel, newlableadd)
+					// log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][labelindex].promlabel, metricLabelValues)
 				}
 			} else if (!metricNameExists){
-			  /* (!compareLabelSet(e.metrics[metricName].promlabel, metricLabels))) {*/
-				eventString = "Creating metric"
-				// e.metrics[metricName] = append(e.metrics[metricName], *prometheusmetric)
-				newMetric.prommetric  = prometheus.NewGaugeVec(
-					prometheus.GaugeOpts{
-						Name: metricName,
-						Help: "Metric pushed via MQTT",
-					},
-					metricLabels,
-				)
+			  // /* (!compareLabelSet(e.metrics[metricName].promlabel, metricLabels))) {*/
+				// eventString = "Creating metric"
+				// // e.metrics[metricName] = append(e.metrics[metricName], *prometheusmetric)
+				// newMetric.prommetric  = prometheus.NewGaugeVec(
+				// 	prometheus.GaugeOpts{
+				// 		Name: metricName,
+				// 		Help: "Metric pushed via MQTT",
+				// 	},
+				// 	metricLabels,
+				// )
+				for index := range metricLabels{
+					newMetric.promlabel = append(newMetric.promlabel , metricLabels[index])
+				}
+				newMetric.prommetric  = createNewMetric(metricName, metricLabels)
 				e.metrics[metricName] = append(e.metrics[metricName], newMetric)
 			} else {
 				eventString = "Updating metric"
@@ -310,19 +327,13 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				log.Debugf("Error %v converting data type for metric %s\n",
 					err, metricName)
 			} else {
-				log.Debugf("%s: name(%s) value(%g) labels(%s) values(%s)\n",
-							eventString, metricName, metricVal, metricLabels, metricLabelValues)
+				log.Debugf("%s: Chetanname(%s) value(%g) labels(%s) values(%s) SPLastTimePushedMetric(%v)\n",
+							eventString, metricName, metricVal, metricLabels, metricLabelValues, e.metrics[SPLastTimePushedMetric][0].prommetric)
 
 			    // NEED to reference e.metric[metricName][metricLabels]
-				for index := range e.metrics[metricName]{
-
-					e.metrics[metricName][index].prommetric.With(metricLabelValues).Set(metricVal)
-					e.metrics[SPLastTimePushedMetric][index].prommetric.With(siteLabelValues).SetToCurrentTime()
-					e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
-				}
-				if len(e.metrics[metricName])>0{
-					log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][0].promlabel, metricLabels)
-				}
+				e.metrics[metricName][labelindex].prommetric.With(metricLabelValues).Set(metricVal)
+				e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
+				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
 			}
 		}
 	}

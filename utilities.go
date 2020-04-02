@@ -63,6 +63,24 @@ func compareLabelSet(testlabels prometheus.Labels, metricLabels []string) (bool)
 	return false
 }
 
+// func addNewLabels(metricName string, metricLabels []string)(prometheusmetric)  {
+// 	i := 0
+//
+// }
+
+func createNewMetric(metricName string, metricLabels []string)(*prometheus.GaugeVec)  {
+	var newMetric prometheusmetric
+	// eventString := "Creating metric"
+	newMetric.prommetric  = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: metricName,
+			Help: "Metric pushed via MQTT",
+		},
+		metricLabels,
+	)
+	return newMetric.prommetric
+}
+
 func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	var labels []string
 	t := strings.TrimPrefix(topic, *prefix)
