@@ -52,21 +52,48 @@ func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
 	return newLabels
 }
 
-func compareLabelSet(testlabels prometheus.Labels, metricLabels []string) (bool) {
-	for key := range testlabels {
-		for km := range metricLabels{
-			if testlabels[key] == metricLabels[km] {
-				return true
+// In order for 2 label sets to match, they have to have the exact same
+// number of entries and the exact same entries orthogonal or the order
+// that they are stored
+
+func compareLabelSet(metricSet []prometheusmetric,
+					newLabels []string) (bool, int) {
+	returnCode := true
+	returnIndex := 0
+
+	for _, existingMetric := range metricSet {
+		tmpIndex := 0
+
+		// Make sure that both label sets have the same number of entries
+		if len(existingMetric.promlabel) == len(newLabels) {
+			// Initially we believe all labeles are unverified
+			// As we verify we decrement, if we end up with something > 0
+			// we know the set does not match
+
+			mismatchedLabels := len(newLabels)
+
+			for _, newLabel := range newLabels {
+				// Compare the current new label to everything in existing
+				// label set
+				for _, existingLabel := range existingMetric.promlabel {
+					if existingLabel == newLabel {
+						mismatchedLabels--
+						break
+					}
+				}
+			}
+
+			if mismatchedLabels == 0 {
+				returnCode = true
+				returnIndex = tmpIndex
+			}
+			}
+
+		tmpIndex++
 		}
-		}
-	}
-	return false
+	return returnCode, returnIndex
 }
 
-// func addNewLabels(metricName string, metricLabels []string)(prometheusmetric)  {
-// 	i := 0
-//
-// }
 
 func createNewMetric(metricName string, metricLabels []string)(*prometheus.GaugeVec)  {
 	var newMetric prometheusmetric

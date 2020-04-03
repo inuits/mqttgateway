@@ -72,37 +72,6 @@ type spplugExporter struct {
 
 	// Holds the mertrics collected
 	metrics     map[string] []prometheusmetric
-
-
-	// [ess_seq
-	// 	- prometheus.Labels{}
-	// 	- prometheus.GaugeVec,
-	// ess_b
-	// 	- prometheus.Labels{}
-	// 	- prometheus.GaugeVec,
-	// ]
-
-
-
-	// [metricName]
-	// - prometheus.Labels{}
-	//   *prometheus.GaugeVec
-	// -
-	// -
-	// -
-	//
-	// [ess_seq]
-	// - ["comptest"]
-	//    Metric Pointer
-	// - ["jason", "bob"]
-	//   Metric Pointer
-	// - NEW ENtRY
-
-	// map: key metricName value: array new a new datastruture
-	// {
-	// 	prometheus.Labels{}
-	// 	*prometheus.GaugeVec
-	// }
 	counterMetrics map[string]*prometheus.CounterVec
 }
 
@@ -241,11 +210,12 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 		metricList := pbMsg.GetMetrics()
 		log.Infof("Received message in processMetric: %s\n", metricList)
+
 		for _, metric := range metricList {
 
 			metricLabels := siteLabels
 			metricLabelValues := cloneLabelSet(siteLabelValues)
-			//
+
 			log.Debugf("Check the data structures: %v : %v",
 			 		   reflect.ValueOf(metricLabels), reflect.ValueOf(siteLabels))
 
@@ -253,7 +223,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 			log.Infof("Received message for metric: %s", metricName)
 
-			if newLabelname!=nil {
+			if newLabelname != nil {
 				for list := 0; list < len(newLabelname); list++ {
 					parts := strings.Split(newLabelname[list], ":")
 
@@ -274,67 +244,60 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			// if metricName is not within the e.metrics OR
 			// if metricLabels (note you will need a function to compare maps) is not within e.metrics[metricName], then you need to create a new metric
 			_, metricNameExists := e.metrics[metricName]
-			var boollabel bool
-			var labelindex int
+			var labelIndex int
+			var labelSetExists bool
 
-			if (metricNameExists){
-				boollabel = false
-				for index := range e.metrics[metricName]{
-					// compareLabelSet(e.metrics[metricName][index].promlabel, metricLabels) == true
-					if len(metricLabels) == len(e.metrics[metricName][index].promlabel) {
-						eventString = "Updating metric"
-						boollabel = true
-						labelindex = index
-					}
+			// If the metric name exists in the map, that means that we
+			// have seen this metric before.   However due to the customized
+			// label support, it's possible that we can use an existing metric
+			// or need to create a new one.
+
+			if (metricNameExists) {
+				// Each entry under a metricName contains a set of label names
+				// and a pointer to the metric.   This is what makes a time
+				// series unique, so if the label names we received are not
+				// contained in the list, we need to create a new entry
+
+				labelSetExists, labelIndex =
+									compareLabelSet(e.metrics[metricName],
+											 		metricLabels)
+
+				// If the labels are not there, we create a new metric.
+				// If they are we update an existing metric
+				if !labelSetExists {
+					eventString = "Creating new timeseries for existing metric name"
+					newMetric.promlabel = append(newMetric.promlabel,
+												metricLabels...)
+
+					newMetric.prommetric = createNewMetric(metricName,
+						 									metricLabels)
+
+					labelIndex = len(e.metrics[metricName])
+
+					e.metrics[metricName] = append(e.metrics[metricName],
+												   newMetric)
 				}
-
-				if boollabel == false{
-
-					for index := range metricLabels{
-						newMetric.promlabel = append(newMetric.promlabel , metricLabels[index])
-					}
-					eventString = "Creating lable with old metric"
-					newMetric.prommetric = createNewMetric(metricName , metricLabels)
-
-					e.metrics[metricName] = append(e.metrics[metricName], newMetric)
-
-					// var newlableadd []string
-					// newlableadd =append(newlableadd , metricLabels)
-					// e.metrics[metricName][labelindex].promlabel = append(e.metrics[metricName][labelindex].promlabel, newlableadd)
-					// log.Infof("Received message for boollebe; metric: %v :  %s", e.metrics[metricName][labelindex].promlabel, metricLabelValues)
+				} else {
+					eventString = "Creating new metric name and timeseries"
+					newMetric.promlabel = append(newMetric.promlabel,
+												metricLabels...)
+					newMetric.prommetric = createNewMetric(metricName,
+									 					metricLabels)
+					labelIndex = 0
+					e.metrics[metricName] = append(e.metrics[metricName],
+												   newMetric)
 				}
-			} else if (!metricNameExists){
-			  // /* (!compareLabelSet(e.metrics[metricName].promlabel, metricLabels))) {*/
-				// eventString = "Creating metric"
-				// // e.metrics[metricName] = append(e.metrics[metricName], *prometheusmetric)
-				// newMetric.prommetric  = prometheus.NewGaugeVec(
-				// 	prometheus.GaugeOpts{
-				// 		Name: metricName,
-				// 		Help: "Metric pushed via MQTT",
-				// 	},
-				// 	metricLabels,
-				// )
-				for index := range metricLabels{
-					newMetric.promlabel = append(newMetric.promlabel , metricLabels[index])
+				if metricVal, err := convertMetricToFloat(metric); err != nil {
+					log.Debugf("Error %v converting data type for metric %s\n",
+						err, metricName)
+				} else {
+					log.Debugf("%s: Chetanname(%s) value(%g) labels(%s) values(%s) SPLastTimePushedMetric(%vgi)\n",
+								eventString, metricName, metricVal, metricLabels, metricLabelValues, e.metrics[SPLastTimePushedMetric][0].prommetric)
+
+					e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)
+					e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
+					e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
 				}
-				newMetric.prommetric  = createNewMetric(metricName, metricLabels)
-				e.metrics[metricName] = append(e.metrics[metricName], newMetric)
-			} else {
-				eventString = "Updating metric"
-			}
-
-			if metricVal, err := convertMetricToFloat(metric); err != nil {
-				log.Debugf("Error %v converting data type for metric %s\n",
-					err, metricName)
-			} else {
-				log.Debugf("%s: Chetanname(%s) value(%g) labels(%s) values(%s) SPLastTimePushedMetric(%v)\n",
-							eventString, metricName, metricVal, metricLabels, metricLabelValues, e.metrics[SPLastTimePushedMetric][0].prommetric)
-
-			    // NEED to reference e.metric[metricName][metricLabels]
-				e.metrics[metricName][labelindex].prommetric.With(metricLabelValues).Set(metricVal)
-				e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
-				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
-			}
 		}
 	}
 }
