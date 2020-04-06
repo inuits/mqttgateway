@@ -209,7 +209,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 			siteLabelValues["sp_edge_node_id"])
 
 		metricList := pbMsg.GetMetrics()
-		log.Infof("Received message in processMetric: %s\n", metricList)
+		log.Debugf("Received message in processMetric: %s\n", metricList)
 
 		for _, metric := range metricList {
 
@@ -221,7 +221,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 			newLabelname, metricName, err := getMetricName(metric)
 
-			log.Infof("Received message for metric: %s", metricName)
+			// log.Infof("Received message for metric: %s", metricName, newLabelname)
 
 			if newLabelname != nil {
 				for list := 0; list < len(newLabelname); list++ {
@@ -265,6 +265,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				// If the labels are not there, we create a new metric.
 				// If they are we update an existing metric
 				if !labelSetExists {
+
 					eventString = "Creating new timeseries for existing metric name"
 					newMetric.promlabel = append(newMetric.promlabel,
 												metricLabels...)
@@ -276,6 +277,9 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 					e.metrics[metricName] = append(e.metrics[metricName],
 												   newMetric)
+				}else{
+					eventString = "Updating metric"
+					e.metrics[metricName][labelIndex].promlabel = metricLabels
 				}
 				} else {
 					eventString = "Creating new metric name and timeseries"
@@ -287,17 +291,17 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					e.metrics[metricName] = append(e.metrics[metricName],
 												   newMetric)
 				}
-				if metricVal, err := convertMetricToFloat(metric); err != nil {
-					log.Debugf("Error %v converting data type for metric %s\n",
-						err, metricName)
-				} else {
-					log.Debugf("%s: Chetanname(%s) value(%g) labels(%s) values(%s) SPLastTimePushedMetric(%vgi)\n",
-								eventString, metricName, metricVal, metricLabels, metricLabelValues, e.metrics[SPLastTimePushedMetric][0].prommetric)
+			if metricVal, err := convertMetricToFloat(metric); err != nil {
+				log.Debugf("Error %v converting data type for metric %s\n",
+					err, metricName)
+			} else {
+				log.Debugf("%s: name(%s) value(%g) labels(%s) values(%s) siteLabelValues(%s)\n",
+							eventString, metricName, metricVal, metricLabels, metricLabelValues,siteLabelValues)
 
-					e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)
-					e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
-					e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
-				}
+				e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)
+				e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
+				e.counterMetrics[SPPushTotalMetric].With(siteLabelValues).Inc()
+			}
 		}
 	}
 }

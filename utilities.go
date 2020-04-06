@@ -3,8 +3,7 @@ package main
 import (
 	"errors"
 	"strings"
-	"reflect"
-	// "fmt"
+
 
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -58,14 +57,14 @@ func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
 
 func compareLabelSet(metricSet []prometheusmetric,
 					newLabels []string) (bool, int) {
-	returnCode := true
+	returnCode := false
 	returnIndex := 0
-
+	tmpIndex := 0
 	for _, existingMetric := range metricSet {
-		tmpIndex := 0
 
 		// Make sure that both label sets have the same number of entries
 		if len(existingMetric.promlabel) == len(newLabels) {
+
 			// Initially we believe all labeles are unverified
 			// As we verify we decrement, if we end up with something > 0
 			// we know the set does not match
@@ -75,7 +74,7 @@ func compareLabelSet(metricSet []prometheusmetric,
 			for _, newLabel := range newLabels {
 				// Compare the current new label to everything in existing
 				// label set
-				for _, existingLabel := range existingMetric.promlabel {
+				for _, existingLabel := range existingMetric.promlabel{
 					if existingLabel == newLabel {
 						mismatchedLabels--
 						break
@@ -83,6 +82,7 @@ func compareLabelSet(metricSet []prometheusmetric,
 				}
 			}
 
+			log.Debugf("mismatchedLabels: %d tmpIndex: %d\n",mismatchedLabels, tmpIndex)
 			if mismatchedLabels == 0 {
 				returnCode = true
 				returnIndex = tmpIndex
@@ -97,7 +97,7 @@ func compareLabelSet(metricSet []prometheusmetric,
 
 func createNewMetric(metricName string, metricLabels []string)(*prometheus.GaugeVec)  {
 	var newMetric prometheusmetric
-	// eventString := "Creating metric"
+
 	newMetric.prommetric  = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: metricName,
@@ -135,9 +135,8 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 		labels = getLabelSet()
 	}
 
-	log.Infof("prometheus.Labels{}: %s\n", prometheus.Labels{})
 	labelValues := prometheus.Labels{}
-
+	log.Debugf("prometheus.Labels{}: %s\n", prometheus.Labels{})
 	// Labels are created from the topic parsing above and compared against
 	// the set of labels for this metric.   If this is a unique set then it will
 	// be stored and the metric will be treated as unique and new.   If the
@@ -188,7 +187,7 @@ func getNodeLabelSet() []string {
 func getMetricName(metric *pb.Payload_Metric)([]string, string, error) {
 	var errUnexpectedType error
 	var labelvalues []string
-	log.Info("data checked",(reflect.TypeOf(metric.GetName())))
+
 	metricName := metric.GetName()
 
 	if strings.Contains(metricName, "/")  == true && metricName != "Device Control/Rebirth"{
@@ -199,7 +198,7 @@ func getMetricName(metric *pb.Payload_Metric)([]string, string, error) {
 			labelvalues = append(labelvalues, parts[metlen])
 
 		}
-	log.Infof("Received message for labelvalues: %s\n", labelvalues)
+	log.Debugf("Received message for labelvalues: %s\n", labelvalues)
 	}
 	metricNameL := model.LabelValue(metricName)
 
