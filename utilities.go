@@ -4,24 +4,22 @@ import (
 	"errors"
 	"strings"
 
-
 	pb "github.com/IHI-Energy-Storage/sparkpluggw/Sparkplug"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/model"
 )
 
 // contants for various SP labels and metric names
 const (
-	SPNamespace				string = "sp_namespace"
-	SPGroupID				string = "sp_group_id"
-	SPEdgeNodeID			string = "sp_edge_node_id"
-	SPDeviceID				string = "sp_device_id"
-	SPkeyID					string = "sp_key_id"
-	SPMQTTTopic				string = "sp_mqtt_topic"
-	SPMQTTServer			string = "sp_mqtt_server"
+	SPNamespace  string = "sp_namespace"
+	SPGroupID    string = "sp_group_id"
+	SPEdgeNodeID string = "sp_edge_node_id"
+	SPDeviceID   string = "sp_device_id"
+	SPMQTTTopic  string = "sp_mqtt_topic"
+	SPMQTTServer string = "sp_mqtt_server"
 )
 
 func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
@@ -41,11 +39,11 @@ func sendMQTTMsg(c mqtt.Client, pbMsg *pb.Payload,
 	return true
 }
 
-func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
+func cloneLabelSet(labels prometheus.Labels) prometheus.Labels {
 	newLabels := prometheus.Labels{}
 
 	for key, value := range labels {
-	  newLabels[key] = value
+		newLabels[key] = value
 	}
 
 	return newLabels
@@ -56,7 +54,7 @@ func cloneLabelSet(labels prometheus.Labels) (prometheus.Labels) {
 // that they are stored
 
 func compareLabelSet(metricSet []prometheusmetric,
-					newLabels []string) (bool, int) {
+	newLabels []string) (bool, int) {
 	returnCode := false
 	returnIndex := 0
 	tmpIndex := 0
@@ -74,7 +72,7 @@ func compareLabelSet(metricSet []prometheusmetric,
 			for _, newLabel := range newLabels {
 				// Compare the current new label to everything in existing
 				// label set
-				for _, existingLabel := range existingMetric.promlabel{
+				for _, existingLabel := range existingMetric.promlabel {
 					if existingLabel == newLabel {
 						mismatchedLabels--
 						break
@@ -82,23 +80,21 @@ func compareLabelSet(metricSet []prometheusmetric,
 				}
 			}
 
-			log.Debugf("mismatchedLabels: %d tmpIndex: %d\n",mismatchedLabels, tmpIndex)
 			if mismatchedLabels == 0 {
 				returnCode = true
 				returnIndex = tmpIndex
 			}
-			}
+		}
 
 		tmpIndex++
-		}
+	}
 	return returnCode, returnIndex
 }
 
-
-func createNewMetric(metricName string, metricLabels []string)(*prometheus.GaugeVec)  {
+func createNewMetric(metricName string, metricLabels []string) *prometheus.GaugeVec {
 	var newMetric prometheusmetric
 
-	newMetric.prommetric  = prometheus.NewGaugeVec(
+	newMetric.prommetric = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: metricName,
 			Help: "Metric pushed via MQTT",
@@ -113,7 +109,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	t := strings.TrimPrefix(topic, *prefix)
 	t = strings.TrimPrefix(t, "/")
 	parts := strings.Split(t, "/")
-	log.Debugf("first test to check the lengh for Metricx: %s: %d\n", parts, len(parts))
+	log.Debugf("Metric after spliting the wrt / and its length: %s: %d\n", parts, len(parts))
 
 	// 6.1.3 covers 9 message types, only process device data
 	// Sparkplug puts 5 key namespacing elements in the topic name
@@ -136,7 +132,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	}
 
 	labelValues := prometheus.Labels{}
-	log.Debugf("prometheus.Labels{}: %s\n", prometheus.Labels{})
+	log.Debugf("Label values it recieve with prometheus.Labels{}: %s\n", prometheus.Labels{})
 	// Labels are created from the topic parsing above and compared against
 	// the set of labels for this metric.   If this is a unique set then it will
 	// be stored and the metric will be treated as unique and new.   If the
@@ -172,8 +168,8 @@ func getNodeLabelSetandValues(namespace string, group string,
 	nodeID string) ([]string, map[string]string) {
 	labels := getNodeLabelSet()
 	labelValues := map[string]string{
-		SPNamespace:    namespace,
-		SPGroupID:     group,
+		SPNamespace:  namespace,
+		SPGroupID:    group,
 		SPEdgeNodeID: nodeID,
 	}
 
@@ -183,26 +179,28 @@ func getNodeLabelSetandValues(namespace string, group string,
 func getNodeLabelSet() []string {
 	return []string{SPNamespace, SPGroupID, SPEdgeNodeID}
 }
-
-func getMetricName(metric *pb.Payload_Metric)([]string, string, error) {
+// This function acceptys MQTT metric message,
+// extracts out the nested folders(if any), add those folder names in Key value labels
+// and return label value sets, metrics wrt to those labelvalues and error(if any)
+func getMetricName(metric *pb.Payload_Metric) ([]string, string, error) {
 	var errUnexpectedType error
 	var labelvalues []string
 
 	metricName := metric.GetName()
 
-	if strings.Contains(metricName, "/")  == true && metricName != "Device Control/Rebirth"{
+	if strings.Contains(metricName, "/") == true && metricName != "Device Control/Rebirth" {
 		parts := strings.Split(metricName, "/")
-		size:= len(parts)
+		size := len(parts)
 		metricName = parts[size-1]
 		for metlen := 0; metlen <= size-2; metlen++ {
 			labelvalues = append(labelvalues, parts[metlen])
 
 		}
-	log.Debugf("Received message for labelvalues: %s\n", labelvalues)
+		log.Debugf("Received message for labelvalues: %s\n", labelvalues)
 	}
 	metricNameL := model.LabelValue(metricName)
 
-	if  model.IsValidMetricName(metricNameL) == true {
+	if model.IsValidMetricName(metricNameL) == true {
 		errUnexpectedType = nil
 	} else {
 		errUnexpectedType = errors.New("Non-compliant metric name")
