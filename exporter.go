@@ -288,8 +288,10 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				log.Debugf("Error %v converting data type for metric %s\n",
 					err, metricName)
 			} else {
-				log.Infof("%s: Metric name(%s) Metric value(%g) Applied labels(%s) Applied labels values(%s) siteLabelValues(%s)\n",
-					eventString, metricName, metricVal, metricLabels, metricLabelValues, siteLabelValues)
+				log.Infof("%s: name (%s) value (%g) labels: (%s)\n",
+							eventString, metricName, metricVal, metricLabelValues)
+				log.Debugf("metriclabels: (%s) siteLabelValues: (%s)\n",
+							metricLabels, siteLabelValues)
 
 				e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)
 				e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
