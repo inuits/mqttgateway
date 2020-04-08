@@ -192,7 +192,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 		}
 
 		topic := m.Topic()
-		log.Infof("Received message: %s\n", topic)
+		log.Debugf("Received message: %s\n", topic)
 		log.Debugf("%s\n", pbMsg.String())
 
 		// Get the labels and value for the labels from the topic and constants
@@ -288,7 +288,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				log.Debugf("Error %v converting data type for metric %s\n",
 					err, metricName)
 			} else {
-				log.Debugf("Event: %s: Metric name(%s) Metric value(%g) Applied labels(%s) Applied labels values(%s) siteLabelValues(%s)\n",
+				log.Infof("%s: Metric name(%s) Metric value(%g) Applied labels(%s) Applied labels values(%s) siteLabelValues(%s)\n",
 					eventString, metricName, metricVal, metricLabels, metricLabelValues, siteLabelValues)
 
 				e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)

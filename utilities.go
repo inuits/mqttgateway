@@ -109,8 +109,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	t := strings.TrimPrefix(topic, *prefix)
 	t = strings.TrimPrefix(t, "/")
 	parts := strings.Split(t, "/")
-	log.Debugf("Metric after spliting the wrt / and its length: %s: %d\n", parts, len(parts))
-
+	
 	// 6.1.3 covers 9 message types, only process device data
 	// Sparkplug puts 5 key namespacing elements in the topic name
 	// these are being parsed and will be added as metric labels
@@ -132,7 +131,7 @@ func prepareLabelsAndValues(topic string) ([]string, prometheus.Labels, bool) {
 	}
 
 	labelValues := prometheus.Labels{}
-	log.Debugf("Label values it recieve with prometheus.Labels{}: %s\n", prometheus.Labels{})
+
 	// Labels are created from the topic parsing above and compared against
 	// the set of labels for this metric.   If this is a unique set then it will
 	// be stored and the metric will be treated as unique and new.   If the
