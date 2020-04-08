@@ -259,7 +259,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 				// If they are we update an existing metric
 				if !labelSetExists {
 
-					eventString = "Creating new timeseries for existing metric name"
+					eventString = "Creating new timeseries for existing metric"
 					newMetric.promlabel = append(newMetric.promlabel,
 						metricLabels...)
 
@@ -275,7 +275,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					e.metrics[metricName][labelIndex].promlabel = metricLabels
 				}
 			} else {
-				eventString = "Creating new metric name and timeseries"
+				eventString = "Creating metric"
 				newMetric.promlabel = append(newMetric.promlabel,
 					metricLabels...)
 				newMetric.prommetric = createNewMetric(metricName,
@@ -289,9 +289,10 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 					err, metricName)
 			} else {
 				log.Infof("%s: name (%s) value (%g) labels: (%s)\n",
-							eventString, metricName, metricVal, metricLabelValues)
+					eventString, metricName, metricVal, metricLabelValues)
+
 				log.Debugf("metriclabels: (%s) siteLabelValues: (%s)\n",
-							metricLabels, siteLabelValues)
+					metricLabels, siteLabelValues)
 
 				e.metrics[metricName][labelIndex].prommetric.With(metricLabelValues).Set(metricVal)
 				e.metrics[SPLastTimePushedMetric][0].prommetric.With(siteLabelValues).SetToCurrentTime()
