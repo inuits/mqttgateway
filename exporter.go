@@ -181,9 +181,9 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 	return func(c mqtt.Client, m mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
-		var newMetric prometheusmetric
-		var pbMsg pb.Payload
-		var eventString string
+
+		var   pbMsg pb.Payload
+		var   eventString string
 
 		// Unmarshal MQTT message into Google Protocol Buffer
 		if err := proto.Unmarshal(m.Payload(), &pbMsg); err != nil {
@@ -212,6 +212,7 @@ func (e *spplugExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 
 		for _, metric := range metricList {
 
+			var newMetric prometheusmetric
 			metricLabels := siteLabels
 			metricLabelValues := cloneLabelSet(siteLabelValues)
 
