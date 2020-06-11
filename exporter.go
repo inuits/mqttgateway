@@ -1,3 +1,16 @@
+// Copyright 2020 The MQTTGateway authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -15,7 +28,6 @@ var mutex sync.RWMutex
 
 type mqttExporter struct {
 	client         mqtt.Client
-	versionDesc    *prometheus.Desc
 	connectDesc    *prometheus.Desc
 	metrics        map[string]*prometheus.GaugeVec   // hold the metrics collected
 	counterMetrics map[string]*prometheus.CounterVec // hold the metrics collected
@@ -44,11 +56,6 @@ func newMQTTExporter() *mqttExporter {
 	// create an exporter
 	c := &mqttExporter{
 		client: m,
-		versionDesc: prometheus.NewDesc(
-			prometheus.BuildFQName(progname, "build", "info"),
-			"Build info of this instance",
-			nil,
-			prometheus.Labels{"version": version}),
 		connectDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(progname, "mqtt", "connected"),
 			"Is the exporter connected to mqtt broker",
@@ -68,7 +75,6 @@ func newMQTTExporter() *mqttExporter {
 func (c *mqttExporter) Describe(ch chan<- *prometheus.Desc) {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	ch <- c.versionDesc
 	ch <- c.connectDesc
 	for _, m := range c.counterMetrics {
 		m.Describe(ch)
@@ -81,13 +87,8 @@ func (c *mqttExporter) Describe(ch chan<- *prometheus.Desc) {
 func (c *mqttExporter) Collect(ch chan<- prometheus.Metric) {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	ch <- prometheus.MustNewConstMetric(
-		c.versionDesc,
-		prometheus.GaugeValue,
-		1,
-	)
 	connected := 0.
-	if c.client.IsConnected() {
+	if c.client.IsConnectionOpen() {
 		connected = 1.
 	}
 	ch <- prometheus.MustNewConstMetric(
@@ -102,12 +103,12 @@ func (c *mqttExporter) Collect(ch chan<- prometheus.Metric) {
 		m.Collect(ch)
 	}
 }
+
 func (e *mqttExporter) receiveMessage() func(mqtt.Client, mqtt.Message) {
 	return func(c mqtt.Client, m mqtt.Message) {
 		mutex.Lock()
 		defer mutex.Unlock()
-		t := m.Topic()
-		t = strings.TrimPrefix(m.Topic(), *prefix)
+		t := strings.TrimPrefix(m.Topic(), *prefix)
 		t = strings.TrimPrefix(t, "/")
 		parts := strings.Split(t, "/")
 		if len(parts)%2 == 0 {
