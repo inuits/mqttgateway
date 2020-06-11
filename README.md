@@ -38,6 +38,11 @@ Requires go
 go get -u github.com/inuits/mqttgateway
 ```
 
+## Installation from binaries
+
+Pre-built binaries are available on the [releases
+page](https://github.com/inuits/mqttgateway/releases).
+
 ## Installation with Docker
 
 [![dockeri.co](https://dockeri.co/image/mqttgateway/mqttgateway)](https://hub.docker.com/r/mqttgateway/mqttgateway)
