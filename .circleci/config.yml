@@ -62,7 +62,6 @@ workflows:
           tags:
             only: /.*/
     - publish_master:
-        context: org-context
         requires:
         - test
         - build
@@ -70,7 +69,6 @@ workflows:
           branches:
             only: master
     - publish_release:
-        context: org-context
         requires:
         - test
         - build
