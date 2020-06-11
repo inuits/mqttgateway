@@ -30,13 +30,30 @@ Flags:
   --log.format="logger:stderr"  Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"
 ```
 
-## Installation
+## Installation from source
 
-Requires go > 1.9
+Requires go
 
 ```
 go get -u github.com/inuits/mqttgateway
 ```
+
+## Installation with Docker
+
+[![dockeri.co](https://dockeri.co/image/mqttgateway/mqttgateway)](https://hub.docker.com/r/mqttgateway/mqttgateway)
+
+Use a MQTT broker which runs locally:
+
+```
+$ docker run --network="host" -p 9337:9337 mqttgateway/mqttgateway
+```
+
+Use a MQTT broker which runs elsewhere:
+
+```
+$ docker run -p 9337:9337 mqttgateway/mqttgateway --mqtt.broker-address="tcp://mosquitto.local:1883"
+```
+
 
 ## How does it work?
 
