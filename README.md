@@ -1,5 +1,8 @@
 # MQTTGateway for Prometheus
 
+[![circleci](https://circleci.com/gh/inuits/mqttgateway/tree/master.svg?style=shield)][circleci]
+[![go report card](https://goreportcard.com/badge/github.com/inuits/mqttgateway)][goreportcard]
+
 A project that subscribes to MQTT queues and published prometheus metrics.
 
 ```
@@ -80,3 +83,6 @@ exporter
 documentation](https://github.com/prometheus/pushgateway#about-the-job-and-instance-labels).
 
 TL;DR: you should set `honor_labels: true` in the scrape config.
+
+[circleci]:https://circleci.com/gh/inuits/mqttgateway
+[goreportcard]:https://goreportcard.com/report/github.com/inuits/mqttgateway
