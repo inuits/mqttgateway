@@ -39,7 +39,7 @@ func main() {
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
 
-	prometheus.MustRegister(version.NewCollector("mqttGateway"))
+	prometheus.MustRegister(version.NewCollector("mqttgateway"))
 	prometheus.MustRegister(newMQTTExporter())
 
 	http.Handle(*metricsPath, promhttp.Handler())
