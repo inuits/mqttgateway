@@ -24,6 +24,13 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[override]]
+  name = "github.com/prometheus/common"
+  version = "v0.25.0"
+
+[[override]]
+  name = "github.com/prometheus/common.log"
+  version = "v0.25.0"
 
 [[constraint]]
   name = "github.com/eclipse/paho.mqtt.golang"
@@ -34,12 +41,8 @@
   branch = "master"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/prometheus/common"
-
-[[constraint]]
   name = "gopkg.in/alecthomas/kingpin.v2"
-  version = "2.2.6"
+  version = "2.2.3"
 
 [prune]
   go-tests = true
